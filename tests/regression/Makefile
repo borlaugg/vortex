@@ -20,6 +20,9 @@ all:
 	$(MAKE) -C coop
 	$(MAKE) -C cg_mse_cm_hw
 	$(MAKE) -C cg_mse_tm_hw
+	$(MAKE) -C warp_reduce_max_hw
+	$(MAKE) -C reduce3_hw
+	$(MAKE) -C reduce4_hw
 
 run-simx:
 	$(MAKE) -C basic run-simx
@@ -40,6 +43,9 @@ run-simx:
 	$(MAKE) -C coop run-simx
 	$(MAKE) -C cg_mse_cm_hw run-simx
 	$(MAKE) -C cg_mse_tm_hw run-simx
+	$(MAKE) -C warp_reduce_max_hw run-simx
+	$(MAKE) -C reduce3_hw run-simx
+	$(MAKE) -C reduce4_hw run-simx
 
 run-rtlsim:
 	$(MAKE) -C basic run-rtlsim
@@ -60,6 +66,9 @@ run-rtlsim:
 	$(MAKE) -C coop run-rtlsim
 	$(MAKE) -C cg_mse_cm_hw run-rtlsim
 	$(MAKE) -C cg_mse_tm_hw run-rtlsim
+	$(MAKE) -C warp_reduce_max_hw run-rtlsim
+	$(MAKE) -C reduce3_hw run-rtlsim
+	$(MAKE) -C reduce4_hw run-rtlsim
 
 run-opae:
 	$(MAKE) -C basic run-opae
@@ -80,6 +89,9 @@ run-opae:
 	$(MAKE) -C coop run-opae
 	$(MAKE) -C cg_mse_cm_hw run-opae
 	$(MAKE) -C cg_mse_tm_hw run-opae
+	$(MAKE) -C warp_reduce_max_hw run-opae
+	$(MAKE) -C reduce3_hw run-opae
+	$(MAKE) -C reduce4_hw run-opae
 
 clean:
 	$(MAKE) -C basic clean
@@ -100,3 +112,6 @@ clean:
 	$(MAKE) -C coop clean
 	$(MAKE) -C cg_mse_cm_hw clean
 	$(MAKE) -C cg_mse_tm_hw clean
+	$(MAKE) -C warp_reduce_max_hw clean
+	$(MAKE) -C reduce3_hw clean
+	$(MAKE) -C reduce4_hw clean
