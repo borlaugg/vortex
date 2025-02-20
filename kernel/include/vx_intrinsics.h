@@ -296,7 +296,8 @@ inline int vx_vote_sync(int pred,
 }
 
 
-inline int vx_shfl_sync(int offset, int mode, int val, int threadMask)
+// mode: 0:UP, 1:DOWN, 2:BFLY, 3:IDX; b: delta or srcLane or laneMask
+inline int vx_shfl_sync(int mode, int threadMask, int val, int b, int width)
 {
     int func3 = mode & 0x3;
 
@@ -304,20 +305,22 @@ inline int vx_shfl_sync(int offset, int mode, int val, int threadMask)
 
     int rd;
 
-    int imm12 = (11) | ((offset & 0x1F) << 5) | (1 << 10);
+    // threadmask at register x11, c at register x12
+    int threadMaskReg = 11;
+    int cReg = 12;
+    int imm12 = (threadMaskReg) | ((b & 0x1F) << 5) | ((cReg-threadMaskReg) << 10);
 
-    int c = -1;
-   
+    int c = width;
+
     __asm__ volatile (
         "addi a1, %[tm], 0\n\t"  // Load immediate value 15 into a1(x11) register (membermask)
         "addi a2, %[c], 0\n\t"  // Load immediate value 15 into a2(x12) register (c) 
         ".insn i %[opcode], %[f3], %[rd], %[rs], %[imm]\n\t"
-        : "=r"(rd)
+        : [rd] "=r"(rd)
         : [tm] "r"(threadMask),
         [c] "r"(c),
         [opcode] "i"(RISCV_CUSTOM2),
         [f3] "i"(func3),
-        [rd] "r"(rd),
         [rs] "r"(rs1),
         [imm] "i"(imm12)
         : 
