@@ -17,12 +17,16 @@ all:
 	$(MAKE) -C sgemm2x
 	$(MAKE) -C vote
 	$(MAKE) -C shfl
+<<<<<<< HEAD
 	$(MAKE) -C coop
 	$(MAKE) -C cg_mse_cm_hw
 	$(MAKE) -C cg_mse_tm_hw
 	$(MAKE) -C warp_reduce_max_hw
 	$(MAKE) -C reduce3_hw
 	$(MAKE) -C reduce4_hw
+=======
+	$(MAKE) -C stencil3d
+>>>>>>> cuda_VoteShfl3
 
 run-simx:
 	$(MAKE) -C basic run-simx
@@ -40,12 +44,16 @@ run-simx:
 	$(MAKE) -C sgemm2x run-simx
 	$(MAKE) -C vote run-simx
 	$(MAKE) -C shfl run-simx
+<<<<<<< HEAD
 	$(MAKE) -C coop run-simx
 	$(MAKE) -C cg_mse_cm_hw run-simx
 	$(MAKE) -C cg_mse_tm_hw run-simx
 	$(MAKE) -C warp_reduce_max_hw run-simx
 	$(MAKE) -C reduce3_hw run-simx
 	$(MAKE) -C reduce4_hw run-simx
+=======
+	$(MAKE) -C stencil3d run-simx
+>>>>>>> cuda_VoteShfl3
 
 run-rtlsim:
 	$(MAKE) -C basic run-rtlsim
@@ -64,34 +72,7 @@ run-rtlsim:
 	$(MAKE) -C vote run-rtlsim
 	$(MAKE) -C shfl run-rtlsim
 	$(MAKE) -C coop run-rtlsim
-	$(MAKE) -C cg_mse_cm_hw run-rtlsim
-	$(MAKE) -C cg_mse_tm_hw run-rtlsim
-	$(MAKE) -C warp_reduce_max_hw run-rtlsim
-	$(MAKE) -C reduce3_hw run-rtlsim
-	$(MAKE) -C reduce4_hw run-rtlsim
-
-run-opae:
-	$(MAKE) -C basic run-opae
-	$(MAKE) -C demo run-opae
-	$(MAKE) -C dogfood run-opae
-	$(MAKE) -C mstress run-opae
-	$(MAKE) -C io_addr run-opae
-	$(MAKE) -C printf run-opae
-	$(MAKE) -C diverge run-opae
-	$(MAKE) -C sort run-opae
-	$(MAKE) -C fence run-opae
-	$(MAKE) -C vecaddx run-opae
-	$(MAKE) -C sgemmx run-opae
-	$(MAKE) -C conv3x run-opae
-	$(MAKE) -C sgemm2x run-opae
-	$(MAKE) -C vote run-opae
-	$(MAKE) -C shfl run-opae
-	$(MAKE) -C coop run-opae
-	$(MAKE) -C cg_mse_cm_hw run-opae
-	$(MAKE) -C cg_mse_tm_hw run-opae
-	$(MAKE) -C warp_reduce_max_hw run-opae
-	$(MAKE) -C reduce3_hw run-opae
-	$(MAKE) -C reduce4_hw run-opae
+	$(MAKE) -C stencil3d run-rtlsim
 
 clean:
 	$(MAKE) -C basic clean
@@ -109,9 +90,13 @@ clean:
 	$(MAKE) -C sgemm2x clean
 	$(MAKE) -C vote clean
 	$(MAKE) -C shfl clean
+<<<<<<< HEAD
 	$(MAKE) -C coop clean
 	$(MAKE) -C cg_mse_cm_hw clean
 	$(MAKE) -C cg_mse_tm_hw clean
 	$(MAKE) -C warp_reduce_max_hw clean
 	$(MAKE) -C reduce3_hw clean
 	$(MAKE) -C reduce4_hw clean
+=======
+	$(MAKE) -C stencil3d clean
+>>>>>>> cuda_VoteShfl3

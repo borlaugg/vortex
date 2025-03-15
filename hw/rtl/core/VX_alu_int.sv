@@ -14,7 +14,7 @@
 `include "VX_define.vh"
 
 module VX_alu_int #(
-    parameter CORE_ID   = 0,
+    parameter `STRING INSTANCE_ID = "",
     parameter BLOCK_IDX = 0,
     parameter NUM_LANES = 1
 ) (
@@ -30,7 +30,7 @@ module VX_alu_int #(
     VX_branch_ctl_if.master branch_ctl_if
 );
 
-    `UNUSED_PARAM (CORE_ID)
+    `UNUSED_SPARAM (INSTANCE_ID)
     localparam LANE_BITS      = `CLOG2(NUM_LANES);
     localparam LANE_WIDTH     = `UP(LANE_BITS);
     localparam PID_BITS       = `CLOG2(`NUM_THREADS / NUM_LANES);
@@ -75,19 +75,19 @@ module VX_alu_int #(
     wire [NUM_LANES-1:0][`XLEN-1:0] alu_in2_imm = execute_if.data.op_args.alu.use_imm ? {NUM_LANES{`SEXT(`XLEN, execute_if.data.op_args.alu.imm)}} : alu_in2;
     wire [NUM_LANES-1:0][`XLEN-1:0] alu_in2_br  = (execute_if.data.op_args.alu.use_imm && ~is_br_op) ? {NUM_LANES{`SEXT(`XLEN, execute_if.data.op_args.alu.imm)}} : alu_in2;
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_add_result
         assign add_result[i] = alu_in1_PC[i] + alu_in2_imm[i];
         assign add_result_w[i] = `XLEN'($signed(alu_in1[i][31:0] + alu_in2_imm[i][31:0]));
     end
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_sub_result
         wire [`XLEN:0] sub_in1 = {is_signed & alu_in1[i][`XLEN-1], alu_in1[i]};
         wire [`XLEN:0] sub_in2 = {is_signed & alu_in2_br[i][`XLEN-1], alu_in2_br[i]};
         assign sub_result[i] = sub_in1 - sub_in2;
         assign sub_result_w[i] = `XLEN'($signed(alu_in1[i][31:0] - alu_in2_imm[i][31:0]));
     end
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_shr_result
         wire [`XLEN:0] shr_in1 = {is_signed && alu_in1[i][`XLEN-1], alu_in1[i]};
         always @(*) begin
             case (alu_op[1:0])
@@ -106,7 +106,7 @@ module VX_alu_int #(
         assign shr_result_w[i] = `XLEN'($signed(shr_res_w));
     end
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_msc_result
         always @(*) begin
             case (alu_op[1:0])
                 2'b00: msc_result[i] = alu_in1[i] & alu_in2_imm[i]; // AND
@@ -126,105 +126,14 @@ module VX_alu_int #(
     wire [NUM_LANES-1:0] is_pred;
     wire [NUM_LANES-1:0] vote_in = (is_pred & active_t);
     wire is_neg = alu_op[2];
-
+    
+    wire vote_all = (is_neg) ? (vote_in == NUM_LANES'(1'b0)) : (vote_in == active_t);
+    wire vote_any = (is_neg) ? (vote_in != active_t) : (vote_in > NUM_LANES'(1'b0));
+    wire vote_uni = ((vote_in == active_t) || (vote_in == NUM_LANES'(1'b0)));
     wire [NUM_LANES-1:0] vote_ballot;
-
-    reg vote_all, vote_any, vote_uni;
-
-    always @(*) begin
-        case (numThreads)
-        
-        32: begin
-            vote_all = (is_neg) ? (vote_in == NUM_LANES'(1'b0)) : (vote_in == active_t);
-            vote_any = (is_neg) ? (vote_in != active_t) : (vote_in > NUM_LANES'(1'b0));
-            vote_uni = ((vote_in == active_t) || (vote_in == NUM_LANES'(1'b0)));
-        end
-
-        16: begin
-            if(wid == 0) begin
-                vote_all = (is_neg) ? ((vote_in & (32'hFFFF0000)) == 32'(1'b0)) : ((vote_in & (32'hFFFF0000)) == (active_t & (32'hFFFF0000)));
-                vote_any = (is_neg) ? ((vote_in & (32'hFFFF0000)) != (active_t & (32'hFFFF0000))) : ((vote_in & (32'hFFFF0000)) > 32'(1'b0));
-                vote_uni = (((vote_in & (32'hFFFF0000))== (active_t & (32'hFFFF0000))) || ((vote_in & (32'hFFFF0000)) == 32'(1'b0)));
-            end
-            else if(wid == 4) begin
-                vote_all = (is_neg) ? ((vote_in & (32'hFFFF)) == 32'(1'b0)) : ((vote_in & (32'hFFFF)) == (active_t & (32'hFFFF)));
-                vote_any = (is_neg) ? ((vote_in & (32'hFFFF)) != (active_t & (32'hFFFF))) : ((vote_in & (32'hFFFF)) > 32'(1'b0));
-                vote_uni = (((vote_in & (32'hFFFF)) == (active_t & (32'hFFFF))) || ((vote_in & (32'hFFFF)) == 32'(1'b0)));
-            end
-        end
-
-        8: begin
-            if(wid == 0) begin
-                vote_all = (is_neg) ? ((vote_in & 32'hFF000000) == 32'(1'b0)) : ((vote_in & 32'hFF000000) == (active_t & 32'hFF000000));
-                vote_any = (is_neg) ? ((vote_in & 32'hFF000000) != (active_t & 32'hFF000000)) : ((vote_in & 32'hFF000000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'hFF000000) == (active_t & 32'hFF000000)) || ((vote_in & 32'hFF000000) == 32'(1'b0)));
-            end
-            else if(wid == 2) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h00FF0000) == 32'(1'b0)) : ((vote_in & 32'h00FF0000) == (active_t & 32'h00FF0000));
-                vote_any = (is_neg) ? ((vote_in & 32'h00FF0000) != (active_t & 32'h00FF0000)) : ((vote_in & 32'h00FF0000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h00FF0000) == (active_t & 32'h00FF0000)) || ((vote_in & 32'h00FF0000) == 32'(1'b0)));
-            end
-            else if(wid == 4) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h0000FF00) == 32'(1'b0)) : ((vote_in & 32'h0000FF00) == (active_t & 32'h0000FF00));
-                vote_any = (is_neg) ? ((vote_in & 32'h0000FF00) != (active_t & 32'h0000FF00)) : ((vote_in & 32'h0000FF00) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h0000FF00) == (active_t & 32'h0000FF00)) || ((vote_in & 32'h0000FF00) == 32'(1'b0)));
-            end
-            else if(wid == 6) begin
-                vote_all = (is_neg) ? ((vote_in & 32'hFF) == 32'(1'b0)) : ((vote_in & 32'hFF) == (active_t & 32'hFF));
-                vote_any = (is_neg) ? ((vote_in & 32'hFF) != (active_t & 32'hFF)) : ((vote_in & 32'hFF) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'hFF) == (active_t & 32'hFF)) || ((vote_in & 32'hFF) == 32'(1'b0)));
-            end
-        end
-
-        4: begin
-            if(wid == 0) begin
-                vote_all = (is_neg) ? ((vote_in & 32'hF0000000)== 32'(1'b0)) : ((vote_in & 32'hF0000000)== (active_t & 32'hF0000000));
-                vote_any = (is_neg) ? ((vote_in & 32'hF0000000)!= (active_t & 32'hF0000000)) : ((vote_in & 32'hF0000000)> 32'(1'b0));
-                vote_uni = (((vote_in & 32'hF0000000)== (active_t & 32'hF0000000)) || ((vote_in & 32'hF0000000)== 32'(1'b0)));
-            end
-            else if(wid == 1) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h0F000000) == 32'(1'b0)) : ((vote_in & 32'h0F000000) == (active_t & 32'h0F000000));
-                vote_any = (is_neg) ? ((vote_in & 32'h0F000000) != (active_t & 32'h0F000000)) : ((vote_in & 32'h0F000000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h0F000000) == (active_t & 32'h0F000000)) || ((vote_in & 32'h0F000000) == 32'(1'b0)));
-            end
-            else if(wid == 2) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h00F00000) == 32'(1'b0)) : ((vote_in & 32'h00F00000) == (active_t & 32'h00F00000));
-                vote_any = (is_neg) ? ((vote_in & 32'h00F00000) != (active_t & 32'h00F00000)) : ((vote_in & 32'h00F00000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h00F00000) == (active_t & 32'h00F00000)) || ((vote_in & 32'h00F00000) == 32'(1'b0)));
-            end
-            else if(wid == 3) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h000F0000) == 32'(1'b0)) : ((vote_in & 32'h000F0000) == (active_t & 32'h000F0000));
-                vote_any = (is_neg) ? ((vote_in & 32'h000F0000) != (active_t & 32'h000F0000)) : ((vote_in & 32'h000F0000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h000F0000) == (active_t & 32'h000F0000)) || ((vote_in & 32'h000F0000) == 32'(1'b0)));
-            end
-            else if(wid == 4) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h0000F000) == 32'(1'b0)) : ((vote_in & 32'h0000F000) == (active_t & 32'h0000F000));
-                vote_any = (is_neg) ? ((vote_in & 32'h0000F000) != (active_t & 32'h0000F000)) : ((vote_in & 32'h0000F000) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h0000F000) == (active_t & 32'h0000F000)) || ((vote_in & 32'h0000F000) == 32'(1'b0)));
-            end
-            else if(wid == 5) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h00000F00) == 32'(1'b0)) : ((vote_in & 32'h00000F00) == (active_t & 32'h00000F00));
-                vote_any = (is_neg) ? ((vote_in & 32'h00000F00) != (active_t & 32'h00000F00)) : ((vote_in & 32'h00000F00) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h00000F00) == (active_t & 32'h00000F00)) || ((vote_in & 32'h00000F00) == 32'(1'b0)));
-            end
-            else if(wid == 6) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h000000F0) == 32'(1'b0)) : ((vote_in & 32'h000000F0) == (active_t & 32'h000000F0));
-                vote_any = (is_neg) ? ((vote_in & 32'h000000F0) != (active_t & 32'h000000F0)) : ((vote_in & 32'h000000F0) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h000000F0) == (active_t & 32'h000000F0)) || ((vote_in & 32'h000000F0) == 32'(1'b0)));
-            end
-            else if(wid == 7) begin
-                vote_all = (is_neg) ? ((vote_in & 32'h0000000F) == 32'(1'b0)) : ((vote_in & 32'h0000000F) == (active_t & 32'h0000000F));
-                vote_any = (is_neg) ? ((vote_in & 32'h0000000F) != (active_t & 32'h0000000F)) : ((vote_in & 32'h0000000F) > 32'(1'b0));
-                vote_uni = (((vote_in & 32'h0000000F) == (active_t & 32'h0000000F)) || ((vote_in & 32'h0000000F) == 32'(1'b0)));
-            end
-        end
-        default: ;
-        endcase
-    end
-
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : vote_result_update
         assign is_pred[i] = alu_in1[i][0] & alu_in2[0][i];
-        assign vote_ballot[i] = vote_in[NUM_LANES - 1 - i][0];
+        assign vote_ballot[i] = vote_in[NUM_LANES - 1 -i];
         always @(*) begin
             case (alu_op[1:0])
                 2'b00: vote_result[i] = `XLEN'(vote_all);       // ALL, NONE
@@ -245,7 +154,7 @@ module VX_alu_int #(
     reg [NUM_LANES-1:0] p;
     reg [NUM_LANES-1:0] active_l;
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : shfl_result_update
         assign b[i] = (alu_in2_imm[i]>>5)&(`XLEN'(5'b11111));
         assign segmask[i] = ((alu_in3[i]>>5)&(`XLEN'(5'b11111)));
         assign c[i] = (alu_in3[i] & `XLEN'(5'b11111));
@@ -277,118 +186,12 @@ module VX_alu_int #(
             if(p[i] == 1'b0) begin
                 lane[i] = `XLEN'(i);
             end
+            active_l[i] = (lane[i] < NUM_LANES) ? alu_in2[0][$signed(lane[i][SHIFT_IMM_BITS-1:0])] : alu_in2[0][i];
+            shfl_result[i] = (active_t[i] && active_l[i]) ? ( (lane[i] < NUM_LANES) ? alu_in1[$signed(lane[i][SHIFT_IMM_BITS-1:0])] : alu_in1[i]) : `XLEN'(1'b0);
         end
     end
 
-    integer k;
-
-    always @(*) begin
-        case(numThreads)
-            32: begin
-                for(k = 0; k < 32; ++k) begin
-                    active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                    shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                end
-            end
-            
-            16: begin
-                if(wid == 0) begin
-                    for(k = 0; k < 16; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if (wid == 4) begin
-                    for(k = 16; k < 32; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-            end
-
-            8: begin
-                if(wid == 0) begin
-                    for(k = 0; k < 8; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 2) begin
-                    for(k = 8; k < 16; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 4) begin
-                    for(k = 16; k < 24; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 6) begin
-                    for(k = 24; k < 32; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-            end
-
-            4: begin
-                if(wid == 0) begin
-                    for(k = 0; k < 4; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 1) begin
-                    for(k = 4; k < 8; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 2) begin
-                    for(k = 8; k < 12; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 3) begin
-                    for(k = 12; k < 16; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 4) begin
-                    for(k = 16; k < 20; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 5) begin
-                    for(k = 20; k < 24; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 6) begin
-                    for(k = 24; k < 28; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-                else if(wid == 7) begin
-                    for(k = 28; k < 32; ++k) begin
-                        active_l[k] = (lane[k] < NUM_LANES) ? alu_in2[0][$signed(lane[k])] : alu_in2[0][k];
-                        shfl_result[k] = (active_t[k] && active_l[k]) ? ( (lane[k] < NUM_LANES) ? alu_in1[$signed(lane[k])] : alu_in1[k]) : `XLEN'(1'b0);
-                    end
-                end
-            end
-
-            default:;
-        endcase
-    end
-
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : Final_results
         wire [`XLEN-1:0] slt_br_result = `XLEN'({is_br_op && ~(| sub_result[i][`XLEN-1:0]), sub_result[i][`XLEN]});
         wire [`XLEN-1:0] sub_slt_br_result = (is_sub_op && ~is_br_op) ? sub_result[i][`XLEN-1:0] : slt_br_result;
         always @(*) begin
@@ -424,9 +227,9 @@ module VX_alu_int #(
 
     assign cbr_dest = add_result[0][1 +: `PC_BITS];
 
-    if (LANE_BITS != 0) begin
+    if (LANE_BITS != 0) begin : g_tid
         assign tid = execute_if.data.tid[0 +: LANE_BITS];
-    end else begin
+    end else begin : g_tid_0
         assign tid = 0;
     end
 
@@ -465,11 +268,11 @@ module VX_alu_int #(
         .clk      (clk),
         .reset    (reset),
         .enable   (1'b1),
-        .data_in  ({br_enable, br_wid, br_taken, br_dest}),
+        .data_in  ({br_enable,           br_wid,            br_taken,            br_dest}),
         .data_out ({branch_ctl_if.valid, branch_ctl_if.wid, branch_ctl_if.taken, branch_ctl_if.dest})
     );
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_commit
         assign commit_if.data.data[i] = (is_br_op_r && is_br_static) ? {(PC_r + `PC_BITS'(2)), 1'd0} : alu_result_r[i];
     end
 
@@ -477,9 +280,9 @@ module VX_alu_int #(
 
 `ifdef DBG_TRACE_PIPELINE
     always @(posedge clk) begin
-        if (branch_ctl_if.valid) begin
-            `TRACE(1, ("%d: core%0d-branch: wid=%0d, PC=0x%0h, taken=%b, dest=0x%0h (#%0d)\n",
-                $time, CORE_ID, branch_ctl_if.wid, {commit_if.data.PC, 1'b0}, branch_ctl_if.taken, {branch_ctl_if.dest, 1'b0}, commit_if.data.uuid));
+        if (br_enable) begin
+            `TRACE(2, ("%t: %s branch: wid=%0d, PC=0x%0h, taken=%b, dest=0x%0h (#%0d)\n",
+                $time, INSTANCE_ID, br_wid, {commit_if.data.PC, 1'b0}, br_taken, {br_dest, 1'b0}, commit_if.data.uuid))
         end
     end
 `endif

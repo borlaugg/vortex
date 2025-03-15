@@ -26,23 +26,15 @@
 #include "emulator.h"
 #include "instr.h"
 #include "core.h"
+#ifdef EXT_V_ENABLE
+#include "processor_impl.h"
+#endif
+#include "VX_types.h"
 
 // #define DEFAULT
 #define GROUPS
 
 using namespace vortex;
-
-union reg_data_t {
-  Word     u;
-  WordI    i;
-  WordF    f;
-  float    f32;
-  double   f64;
-  uint32_t u32;
-  uint64_t u64;
-  int32_t  i32;
-  int64_t  i64;
-};
 
 inline uint64_t nan_box(uint32_t value) {
   return value | 0xffffffff00000000;
@@ -81,8 +73,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   trace->PC    = warp[wid].PC;
   trace->tmask = warp[wid].tmask;
 #endif
-  trace->rdest = instr.getRDest();
-  trace->rdest_type = instr.getRDType();
+  trace->dst_reg = {instr.getRDType(), instr.getRDest()};
 #ifdef DEFAULT
   auto next_pc = warp.PC + 4;
   auto next_tmask = warp.tmask;
@@ -140,7 +131,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
       auto reg = instr.getRSrc(i);
       switch (type) {
       case RegType::Integer:
-        DPH(2, "Src" << std::dec << i << " Reg: " << type << std::dec << reg << "={");
+        DPH(2, "Src" << i << " Reg: " << type << reg << "={");
         for (uint32_t t = 0; t < num_threads; ++t) {
           if (t) DPN(2, ", ");
 #ifdef DEFAULT
@@ -161,12 +152,12 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef GROUPS
           rsdata[t][i].u = warp[wid + t/THREAD_PER_TILE].ireg_file.at(t%THREAD_PER_TILE)[reg];
 #endif
-          DPN(2, "0x" << std::hex << rsdata[t][i].i);
+          DPN(2, "0x" << std::hex << rsdata[t][i].i << std::dec);
         }
         DPN(2, "}" << std::endl);
         break;
       case RegType::Float:
-        DPH(2, "Src" << std::dec << i << " Reg: " << type << std::dec << reg << "={");
+        DPH(2, "Src" << i << " Reg: " << type << reg << "={");
         for (uint32_t t = 0; t < num_threads; ++t) {
           if (t) DPN(2, ", ");
 #ifdef DEFAULT
@@ -187,11 +178,15 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef GROUPS
           rsdata[t][i].u64 = warp[wid + t/THREAD_PER_TILE].freg_file.at(t%THREAD_PER_TILE)[reg];
 #endif
-          DPN(2, "0x" << std::hex << rsdata[t][i].f);
+          DPN(2, "0x" << std::hex << rsdata[t][i].f << std::dec);
         }
         DPN(2, "}" << std::endl);
         break;
-      case RegType::None:
+    #ifdef EXT_V_ENABLE
+      case RegType::Vector:
+        break;
+    #endif
+      default:
         break;
       }
     }
@@ -243,8 +238,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::R: {
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::ARITH;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, rsrc1};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -426,7 +421,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::I: {
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::ARITH;
-    trace->used_iregs.set(rsrc0);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -492,8 +487,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::R_W: {
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::ARITH;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, rsrc1};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -625,7 +620,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::I_W: {
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::ARITH;
-    trace->used_iregs.set(rsrc0);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -674,8 +669,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::B: {
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::BRANCH;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, rsrc1};
     bool all_taken = false;
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
@@ -815,7 +810,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     // RV32I: JALR
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::BRANCH;
-    trace->used_iregs.set(rsrc0);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -836,7 +831,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::FL: {
     trace->fu_type = FUType::LSU;
     trace->lsu_type = LsuType::LOAD;
-    trace->used_iregs.set(rsrc0);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
     auto trace_data = std::make_shared<LsuTraceData>(num_threads);
     trace->data = trace_data;
     uint32_t data_bytes = 1 << (func3 & 0x3);
@@ -863,31 +858,43 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         if (opcode == Opcode::L) {
           // RV32I: LW
           rddata[t].i = sext((Word)read_data, data_width);
-        } else {
-          // RV32F: FLW
-          rddata[t].u64 = nan_box((uint32_t)read_data);
+          break;
+        case 2:
+          if (opcode == Opcode::L) {
+            // RV32I: LW
+            rddata[t].i = sext((Word)read_data, data_width);
+          } else {
+            // RV32F: FLW
+            rddata[t].u64 = nan_box((uint32_t)read_data);
+          }
+          break;
+        case 3: // RV64I: LD
+                // RV32D: FLD
+        case 4: // RV32I: LBU
+        case 5: // RV32I: LHU
+        case 6: // RV64I: LWU
+          rddata[t].u64 = read_data;
+          break;
+        default:
+          std::abort();
         }
-        break;
-      case 3: // RV64I: LD
-              // RV32D: FLD
-      case 4: // RV32I: LBU
-      case 5: // RV32I: LHU
-      case 6: // RV64I: LWU
-        rddata[t].u64 = read_data;
-        break;
-      default:
-        std::abort();
       }
+      rd_write = true;
     }
-    rd_write = true;
+  #ifdef EXT_V_ENABLE
+    else {
+      this->loadVector(instr, wid, rsdata);
+    }
+  #endif
     break;
   }
   case Opcode::S:
   case Opcode::FS: {
     trace->fu_type = FUType::LSU;
     trace->lsu_type = LsuType::STORE;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    auto data_type = (opcode == Opcode::FS) ? RegType::Float : RegType::Integer;
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {data_type, rsrc1};
     auto trace_data = std::make_shared<LsuTraceData>(num_threads);
     trace->data = trace_data;
     uint32_t data_bytes = 1 << (func3 & 0x3);
@@ -914,13 +921,18 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         std::abort();
       }
     }
+  #ifdef EXT_V_ENABLE
+    else {
+      this->storeVector(instr, wid, rsdata);
+    }
+  #endif
     break;
   }
   case Opcode::AMO: {
     trace->fu_type = FUType::LSU;
     trace->lsu_type = LsuType::LOAD;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, rsrc1};
     auto trace_data = std::make_shared<LsuTraceData>(num_threads);
     trace->data = trace_data;
     auto amo_type = func7 >> 2;
@@ -1014,7 +1026,11 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         trace->fetch_stall = true;
         switch (csr_addr) {
         case 0x000: // RV32I: ECALL
+          this->trigger_ecall(); // Re-added for riscv-vector test functionality
+          break;
         case 0x001: // RV32I: EBREAK
+          this->trigger_ebreak(); // Re-added for riscv-vector test functionality
+          break;
         case 0x002: // RV32I: URET
         case 0x102: // RV32I: SRET
         case 0x302: // RV32I: MRET
@@ -1024,14 +1040,15 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         }
       } else {
         trace->fu_type = FUType::SFU;
-        trace->fetch_stall = true;
-        csr_value = this->get_csr(csr_addr, t,wid);
+        // stall the fetch stage for FPU CSRs
+        trace->fetch_stall = (csr_addr <= VX_CSR_FCSR);
+        csr_value = this->get_csr(csr_addr, t, wid);
         switch (func3) {
         case 1: {
           // RV32I: CSRRW
           rddata[t].i = csr_value;
           this->set_csr(csr_addr, rsdata[t][0].i, t, wid);
-          trace->used_iregs.set(rsrc0);
+          trace->src_regs[0] = {RegType::Integer, rsrc0};
           trace->sfu_type = SfuType::CSRRW;
           rd_write = true;
           break;
@@ -1042,7 +1059,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           if (rsdata[t][0].i != 0) {
             this->set_csr(csr_addr, csr_value | rsdata[t][0].i, t, wid);
           }
-          trace->used_iregs.set(rsrc0);
+          trace->src_regs[0] = {RegType::Integer, rsrc0};
           trace->sfu_type = SfuType::CSRRS;
           rd_write = true;
           break;
@@ -1053,7 +1070,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           if (rsdata[t][0].i != 0) {
             this->set_csr(csr_addr, csr_value & ~rsdata[t][0].i, t, wid);
           }
-          trace->used_iregs.set(rsrc0);
+          trace->src_regs[0] = {RegType::Integer, rsrc0};
           trace->sfu_type = SfuType::CSRRC;
           rd_write = true;
           break;
@@ -1116,57 +1133,57 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
       case 0x00: { // RV32F: FADD.S
         rddata[t].u64 = nan_box(rv_fadd_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), frm, &fflags));
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x01: { // RV32D: FADD.D
         rddata[t].u64 = rv_fadd_d(rsdata[t][0].u64, rsdata[t][1].u64, frm, &fflags);
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x04: { // RV32F: FSUB.S
         rddata[t].u64 = nan_box(rv_fsub_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), frm, &fflags));
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x05: { // RV32D: FSUB.D
         rddata[t].u64 = rv_fsub_d(rsdata[t][0].u64, rsdata[t][1].u64, frm, &fflags);
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x08: { // RV32F: FMUL.S
         rddata[t].u64 = nan_box(rv_fmul_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), frm, &fflags));
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x09: { // RV32D: FMUL.D
         rddata[t].u64 = rv_fmul_d(rsdata[t][0].u64, rsdata[t][1].u64, frm, &fflags);
         trace->fpu_type = FpuType::FMA;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x0c: { // RV32F: FDIV.S
         rddata[t].u64 = nan_box(rv_fdiv_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), frm, &fflags));
         trace->fpu_type = FpuType::FDIV;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x0d: { // RV32D: FDIV.D
         rddata[t].u64 = rv_fdiv_d(rsdata[t][0].u64, rsdata[t][1].u64, frm, &fflags);
         trace->fpu_type = FpuType::FDIV;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x10: {
@@ -1182,8 +1199,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x11: {
@@ -1199,8 +1216,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x14: {
@@ -1212,8 +1229,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           rddata[t].u64 = nan_box(rv_fmin_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), &fflags));
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x15: {
@@ -1225,34 +1242,34 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           rddata[t].u64 = rv_fmin_d(rsdata[t][0].u64, rsdata[t][1].u64, &fflags);
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x20: {
         // RV32D: FCVT.S.D
         rddata[t].u64 = nan_box(rv_dtof(rsdata[t][0].u64));
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x21: {
         // RV32D: FCVT.D.S
         rddata[t].u64 = rv_ftod(check_boxing(rsdata[t][0].u64));
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x2c: { // RV32F: FSQRT.S
         rddata[t].u64 = nan_box(rv_fsqrt_s(check_boxing(rsdata[t][0].u64), frm, &fflags));
         trace->fpu_type = FpuType::FSQRT;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x2d: { // RV32D: FSQRT.D
         rddata[t].u64 = rv_fsqrt_d(rsdata[t][0].u64, frm, &fflags);
         trace->fpu_type = FpuType::FSQRT;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x50: {
@@ -1271,8 +1288,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x51: {
@@ -1291,8 +1308,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
-        trace->used_fregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
+        trace->src_regs[1] = {RegType::Float, rsrc1};
         break;
       }
       case 0x60: {
@@ -1315,7 +1332,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FCVT;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x61: {
@@ -1338,7 +1355,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FCVT;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x68: {
@@ -1361,7 +1378,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FCVT;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         break;
       }
       case 0x69: {
@@ -1384,7 +1401,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           break;
         }
         trace->fpu_type = FpuType::FCVT;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         break;
       }
       case 0x70: {
@@ -1397,7 +1414,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           rddata[t].i = sext((uint64_t)result, 32);
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x71: {
@@ -1409,19 +1426,19 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           rddata[t].i = rsdata[t][0].u64;
         }
         trace->fpu_type = FpuType::FNCP;
-        trace->used_fregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Float, rsrc0};
         break;
       }
       case 0x78: { // RV32F: FMV.S.X
         rddata[t].u64 = nan_box((uint32_t)rsdata[t][0].i);
         trace->fpu_type = FpuType::FNCP;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         break;
       }
       case 0x79: { // RV64D: FMV.D.X
         rddata[t].u64 = rsdata[t][0].i;
         trace->fpu_type = FpuType::FNCP;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         break;
       }
       }
@@ -1435,9 +1452,9 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   case Opcode::FMNMADD:
   case Opcode::FMNMSUB: {
     trace->fpu_type = FpuType::FMA;
-    trace->used_fregs.set(rsrc0);
-    trace->used_fregs.set(rsrc1);
-    trace->used_fregs.set(rsrc2);
+    trace->src_regs[0] = {RegType::Float, rsrc0};
+    trace->src_regs[1] = {RegType::Float, rsrc1};
+    trace->src_regs[2] = {RegType::Float, rsrc2};
     for (uint32_t t = thread_start; t < num_threads; ++t) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
@@ -1498,7 +1515,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // TMC
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::TMC;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         trace->fetch_stall = true;
         next_tmask.reset();
         for (uint32_t t = 0; t < num_threads; ++t) {
@@ -1509,8 +1526,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // WSPAWN
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::WSPAWN;
-        trace->used_iregs.set(rsrc0);
-        trace->used_iregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
+        trace->src_regs[1] = {RegType::Integer, rsrc1};
         trace->fetch_stall = true;
         trace->data = std::make_shared<SFUTraceData>(rsdata.at(thread_last)[0].i, rsdata.at(thread_last)[1].i);
       } break;
@@ -1518,7 +1535,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // SPLIT
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::SPLIT;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         trace->fetch_stall = true;
 #ifdef DEFAULT
         auto stack_size = warp.ipdom_stack.size();
@@ -1527,7 +1544,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         auto stack_size = warp[wid].ipdom_stack.size();
 #endif
         ThreadMask then_tmask, else_tmask;
-        auto not_pred = rsrc2 & 0x1;
+        auto not_pred = (rsrc1 != 0);
         for (uint32_t t = 0; t < num_threads; ++t) {
 #ifdef DEFAULT
           auto cond = (warp.ireg_file.at(t).at(rsrc0) & 0x1) ^ not_pred;
@@ -1558,21 +1575,13 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           } else {
             next_tmask = else_tmask;
           }
-          // push reconvergence thread mask onto the stack
-#ifdef DEFAULT          
-          warp.ipdom_stack.emplace(warp.tmask);
-#endif
-#ifdef GROUPS
-          warp[wid].ipdom_stack.emplace(warp[wid].tmask);
-#endif          
-          // push not taken thread mask onto the stack
 #ifdef DEFAULT
           auto ntaken_tmask = ~next_tmask & warp.tmask;
-          warp.ipdom_stack.emplace(ntaken_tmask, next_pc);
+          warp.ipdom_stack.emplace(warp.tmask, ntaken_tmask, next_pc);
 #endif
 #ifdef GROUPS
           auto ntaken_tmask = ~next_tmask & warp[wid].tmask;
-          warp[wid].ipdom_stack.emplace(ntaken_tmask, next_pc);
+          warp[wid].ipdom_stack.emplace(warp[wid].tmask, ntaken_tmask, next_pc);
 #endif
         }
         // return divergent state
@@ -1585,7 +1594,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // JOIN
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::JOIN;
-        trace->used_iregs.set(rsrc0);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
         trace->fetch_stall = true;
 #ifdef DEFAULT
         auto stack_ptr = warp.ireg_file.at(thread_last).at(rsrc0);
@@ -1594,12 +1603,14 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
             std::cout << "IPDOM stack is empty!\n" << std::flush;
             std::abort();
           }
-          next_tmask = warp.ipdom_stack.top().tmask;
-          if (!warp.ipdom_stack.top().fallthrough) {
+          if (warp.ipdom_stack.top().fallthrough) {
+            next_tmask = warp.ipdom_stack.top().orig_tmask;
+            warp.ipdom_stack.pop();
+          } else {
+            next_tmask = warp.ipdom_stack.top().else_tmask;
             next_pc = warp.ipdom_stack.top().PC;
-            DP(3, " next PC: " << std::hex << next_pc);
+            warp.ipdom_stack.top().fallthrough = true;
           }
-          warp.ipdom_stack.pop();
         }
 #endif
 #ifdef GROUPS
@@ -1609,12 +1620,14 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
             std::cout << "IPDOM stack is empty!\n" << std::flush;
             std::abort();
           }
-          next_tmask = warp[wid].ipdom_stack.top().tmask;
-          if (!warp[wid].ipdom_stack.top().fallthrough) {
+          if (warp[wid].ipdom_stack.top().fallthrough) {
+            next_tmask = warp[wid].ipdom_stack.top().orig_tmask;
+            warp[wid].ipdom_stack.pop();
+          } else {
+            next_tmask = warp[wid].ipdom_stack.top().else_tmask;
             next_pc = warp[wid].ipdom_stack.top().PC;
-            DP(3, " next PC: " << std::hex << next_pc);
+            warp[wid].ipdom_stack.top().fallthrough = true;
           }
-          warp[wid].ipdom_stack.pop();
         }
 #endif
       } break;
@@ -1622,8 +1635,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // BAR
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::BAR;
-        trace->used_iregs.set(rsrc0);
-        trace->used_iregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
+        trace->src_regs[1] = {RegType::Integer, rsrc1};
         trace->fetch_stall = true;
         trace->data = std::make_shared<SFUTraceData>(rsdata[thread_last][0].i, rsdata[thread_last][1].i);
       } break;
@@ -1631,8 +1644,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         // PRED
         trace->fu_type = FUType::SFU;
         trace->sfu_type = SfuType::PRED;
-        trace->used_iregs.set(rsrc0);
-        trace->used_iregs.set(rsrc1);
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
+        trace->src_regs[1] = {RegType::Integer, rsrc1};
         trace->fetch_stall = true;
         ThreadMask pred;
         auto not_pred = rdest & 0x1;
@@ -1665,38 +1678,32 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
       std::abort();
     }
   } break;
-//   case Opcode::EXT2: {
-//     switch (func3) {
-//     case 1:
-//       switch (func2) {
-//       case 0: { // CMOV
-//         trace->fu_type = FUType::SFU;
-//         trace->sfu_type = SfuType::CMOV;
-//         trace->used_iregs.set(rsrc0);
-//         trace->used_iregs.set(rsrc1);
-//         trace->used_iregs.set(rsrc2);
-//         for (uint32_t t = thread_start; t < num_threads; ++t) {
-// #ifdef DEFAULT
-//           if (!warp.tmask.test(t))
-//             continue;
-//   #endif
-// #ifdef GROUPS        
-//           if (!warp[wid].tmask.test(t))
-//             continue;
-// #endif
-//           rddata[t].i = rsdata[t][0].i ? rsdata[t][1].i : rsdata[t][2].i;
-//         }
-//         rd_write = true;
-//       } break;
-//       default:
-//         std::abort();
-//       }
-//       break;
-//     default:
-//       std::abort();
-//     }
-//   } break;
-    case Opcode::VOTE: {
+  // case Opcode::EXT2: {
+  //   switch (func3) {
+  //   case 1:
+  //     switch (func2) {
+  //     case 0: { // CMOV
+  //       trace->fu_type = FUType::SFU;
+  //       trace->sfu_type = SfuType::CMOV;
+  //       trace->used_iregs.set(rsrc0);
+  //       trace->used_iregs.set(rsrc1);
+  //       trace->used_iregs.set(rsrc2);
+  //       for (uint32_t t = thread_start; t < num_threads; ++t) {
+  //         if (!warp.tmask.test(t))
+  //           continue;
+  //         rddata[t].i = rsdata[t][0].i ? rsdata[t][1].i : rsdata[t][2].i;
+  //       }
+  //       rd_write = true;
+  //     } break;
+  //     default:
+  //       std::abort();
+  //     }
+  //     break;
+  //   default:
+  //     std::abort();
+  //   }
+  // } break;
+    case Opcode::EXT2: {      //Vote
     bool check;
     bool is_neg = (func3 >= 4);
     func3 = func3%4;
@@ -1709,8 +1716,8 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef GROUPS
     auto mask =  warp[wid].ireg_file.at(0)[address];
 #endif
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(address);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, address};
     switch (func3) {
     case 0:{ //all
       check = true;
@@ -1858,7 +1865,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     } break;
     }
   }break;
-  case Opcode::SHFL:{
+  case Opcode::EXT3:{     //Shfl
     trace->fu_type = FUType::ALU;
     trace->alu_type = AluType::ARITH;
     uint32_t address = immsrc & 0x01f;
@@ -1927,16 +1934,16 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         rd_write = true;
       }
     }
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(address);
-    trace->used_iregs.set(c_add);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, address};
+    trace->src_regs[2] = {RegType::Integer, c_add};
     
   }break;
 #ifdef GROUPS
   case Opcode::TILE:{
     trace->fu_type = FUType::SFU;
-    trace->used_iregs.set(rsrc0);
-    trace->used_iregs.set(rsrc1);
+    trace->src_regs[0] = {RegType::Integer, rsrc0};
+    trace->src_regs[1] = {RegType::Integer, rsrc1};
     trace->fetch_stall = true;
     trace->sfu_type = SfuType::TILE;
     auto tile_mask = rsdata.at(thread_last)[0].i;
@@ -1945,6 +1952,179 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     
   }
   break;
+  case Opcode::TCU:
+  { //TODO - make it data-type flexible
+    uint32_t mem_bytes = 1;
+    DP(3, "mem_bytes=" << mem_bytes << std::endl);
+    uint16_t tc_size = this->get_csr(VX_TC_SIZE, 0, wid);
+    uint32_t TC_per_warp = this->get_csr(VX_TC_NUM, 0, wid);
+
+    DP(3, "tc_size=" << tc_size << std::endl);
+    DP(3, "TC_per_warp=" << TC_per_warp << std::endl);
+
+    //Number of loads - dependant on the thread config
+    uint32_t n_tiles = this->get_csr(VX_MAT_MUL_SIZE, 0, wid);  //CSR instruction before MLOAD will ensure that this csr has value
+    int num_data_per_thread;
+    int num_data_per_thread_st;
+    uint32_t num_threads_actv;
+    uint32_t num_threads_actv_st;
+    uint32_t data_bytes_load;
+    uint32_t data_bytes_store;
+    uint32_t num_threads_per_tc = MAX (1, num_threads/TC_per_warp);
+
+    //LOAD
+    if(num_threads > tc_size*tc_size*n_tiles*TC_per_warp)
+    {
+      num_threads_actv = tc_size*tc_size*n_tiles*TC_per_warp;
+      num_data_per_thread = 1;
+    }
+    else
+    {
+      num_threads_actv = num_threads;
+      num_data_per_thread = (tc_size*tc_size*n_tiles)/num_threads_per_tc;
+    }
+    data_bytes_load = mem_bytes*num_data_per_thread;
+
+    //STORE
+    if(num_threads > tc_size*tc_size*TC_per_warp)
+    {
+      num_threads_actv_st = tc_size*tc_size*TC_per_warp;
+      num_data_per_thread_st = 1;
+    }
+    else
+    {
+      num_threads_actv_st = num_threads;
+      num_data_per_thread_st = (tc_size*tc_size)/num_threads_per_tc;
+    }
+    data_bytes_store = mem_bytes*num_data_per_thread_st;
+
+    DP(3, "Num Tiles=" << n_tiles << std::endl);
+
+    switch (func3) {
+      case 0:
+      { //Matrix Load
+
+        DP (4, "TCU LOAD");
+        trace->fu_type = FUType::LSU;
+        trace->lsu_type = LsuType::TCU_LOAD;
+
+        trace->src_regs[0] = {RegType::Integer, rsrc0};
+        auto trace_data = std::make_shared<LsuTraceData>(num_threads);
+        trace->data = trace_data;
+
+        for (uint32_t t = thread_start; t < num_threads_actv; ++t)
+        {
+          if (!warp.tmask.test(t))
+            continue;
+          DP(3, "Thread ID" << t);
+
+          uint32_t base_addr = rsdata[t][0].i ;
+          trace_data->mem_addrs.at(t) = {base_addr, data_bytes_load};
+
+          //Load A or B (depends on immsrc)
+          int loop_offset = 0;
+          DP(3, "n_tiles = " << n_tiles << "; num_data_per_thread = " << num_data_per_thread <<std::endl);
+            for (int n=0; n<num_data_per_thread; n++)
+            {
+              Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+              this->dcache_read(temp_ref, (base_addr+(n*mem_bytes)+(loop_offset*mem_bytes)), mem_bytes);
+
+              scratchpad[loop_offset + (immsrc*(n_tiles)*tc_size*tc_size) + (t*num_data_per_thread) + n] = *temp_ref;
+              DP(3, "Scratchpad Index: " << loop_offset + (immsrc*(n_tiles)*tc_size*tc_size) + (t*num_data_per_thread) + n << ", Value: " << scratchpad[loop_offset + (immsrc*(n_tiles)*tc_size*tc_size) + (t*num_data_per_thread) + n]);
+            }
+        }
+        rd_write = true;
+      } break;
+      case 1:
+      {
+        DP(4, "TCU STORE");
+        trace->fu_type = FUType::LSU;
+        trace->lsu_type = LsuType::TCU_STORE;
+
+        auto trace_data = std::make_shared<LsuTraceData>(num_threads);
+        trace->data = trace_data;
+
+        for (uint32_t t = thread_start; t < num_threads_actv_st; ++t)
+        {
+          if (!warp.tmask.test(t))
+            continue;
+
+          DP(3, "Thread ID" << t);
+          uint32_t base_addr = rsdata[t][0].i ;
+
+          trace_data->mem_addrs.at(t) = {base_addr, data_bytes_store};
+
+          //Store C
+          for (int n=0; n<num_data_per_thread_st; n++)
+          {
+            Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+            *temp_ref = scratchpad[(n_tiles*tc_size*tc_size*2) + (t*num_data_per_thread_st) + n];
+
+            this->dcache_write(temp_ref, base_addr+(n*mem_bytes), mem_bytes);
+          }
+        }
+        //Clear the scratchpad
+        for(long unsigned int i=0 ; i < scratchpad.size(); i++)
+        {
+          scratchpad[i] = 0;
+        }
+      }
+      break;
+      case 2:
+      { //Matrix Multiply
+        DP(4, "TCU MULTIPLY MAT");
+        trace->fu_type = FUType::TCU;
+        trace->tcu_type = TCUType::TCU_MUL;
+        uint32_t threads_per_tc = MAX (1, num_threads/TC_per_warp);
+        for (uint32_t t = thread_start; t < num_threads_actv; ++t)
+        {
+          if (!warp.tmask.test(t))
+            continue;
+
+          DP(3, "Thread ID" << t);
+          //TC operation [only 1 thread in 1 warp needs to do this]
+          if (t%threads_per_tc == 0)
+          {
+            /*
+            // TODO : Fix needed for functional correctness
+            // TODO : change to systolic array implementation
+            uint32_t thread_offset = t*(tc_size*tc_size);
+
+            int loop_offset = 0;
+            int offset_b = n_tiles*n_tiles*n_tiles*tc_size*tc_size;
+            uint32_t accu_offset = (n_tiles)*(n_tiles)*(n_tiles)*tc_size*tc_size*2;
+            for(int tiles = 0 ; tiles < n_tiles ; tiles++)  //What's the HW implication of this?? A counter implementation?
+            {
+              for (int i = 0; i < tc_size; i++) { //ROW-1
+                for (int j = 0; j < tc_size; j++) { //COL-2
+                  int sum = 0;
+                  for (int k = 0; k < tc_size; k++)
+                  { //COL-1
+                    sum = sum + scratchpad[loop_offset + thread_offset*n_tiles + i * tc_size + k] *scratchpad[loop_offset + thread_offset*n_tiles + offset_b + (k * tc_size + j)];
+                  }
+                  scratchpad[accu_offset + thread_offset +(i * tc_size + j)] += sum; //[i * col2 + j] = sum
+                  DP(3, "Scratchpad Index: " << accu_offset + (i * tc_size + j) << " , Value=" << scratchpad[accu_offset + (i * tc_size + j)]);
+                }
+              }
+              loop_offset += tc_size*tc_size; //Move to the next tiled matmul fragment
+            }
+            */
+          }
+        }
+
+      }break;
+      default:
+        std::abort();
+    }
+  } break;
+#ifdef EXT_V_ENABLE
+  case Opcode::VSET: {
+    auto func6 = instr.getFunc6();
+    if ((func3 == 0x7) || (func3 == 0x2 && func6 == 16) || (func3 == 0x1 && func6 == 16)) {
+      rd_write = true;
+    }
+    executeVector(instr, wid, rsdata, rddata);
+  } break;
 #endif
   default:
     std::abort();
@@ -1956,7 +2136,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     switch (type) {
     case RegType::Integer:
       if (rdest) {
-        DPH(2, "Dest Reg: " << type << std::dec << rdest << "={");
+        DPH(2, "Dest Reg: " << type << rdest << "={");
         for (uint32_t t = 0; t < num_threads; ++t) {
           if (t) DPN(2, ", ");
 #ifdef DEFAULT
@@ -1977,10 +2157,10 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef GROUPS
           warp[wid + t/THREAD_PER_TILE].ireg_file.at(t%THREAD_PER_TILE)[rdest] = rddata[t].i;
 #endif
-          DPN(2, "0x" << std::hex << rddata[t].i);
+          DPN(2, "0x" << std::hex << rddata[t].i << std::dec);
         }
         DPN(2, "}" << std::endl);
-        trace->used_iregs[rdest] = 1;
+        trace->dst_reg = {type, rdest};
         assert(rdest != 0);
       } else {
         // disable writes to x0
@@ -1988,7 +2168,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
       }
       break;
     case RegType::Float:
-      DPH(2, "Dest Reg: " << type << std::dec << rdest << "={");
+      DPH(2, "Dest Reg: " << type << rdest << "={");
       for (uint32_t t = 0; t < num_threads; ++t) {
         if (t) DPN(2, ", ");
 #ifdef DEFAULT
@@ -2009,12 +2189,13 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef GROUPS
         warp[wid + t/THREAD_PER_TILE].freg_file.at(t%THREAD_PER_TILE)[rdest] = rddata[t].u64;
 #endif
-        DPN(2, "0x" << std::hex << rddata[t].f);
+        DPN(2, "0x" << std::hex << rddata[t].f << std::dec);
       }
       DPN(2, "}" << std::endl);
-      trace->used_fregs[rdest] = 1;
+      trace->dst_reg = {type, rdest};
       break;
     default:
+      std::cout << "Unrecognized register write back type: " << type << std::endl;
       std::abort();
       break;
     }
@@ -2040,10 +2221,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #endif
 #ifdef DEFAULT
   if (warp.tmask != next_tmask) {
-    DPH(3, "*** New Tmask=");
-    for (uint32_t i = 0; i < num_threads; ++i)
-      DPN(3, next_tmask.test(i));
-    DPN(3, std::endl);
+    DP(3, "*** New Tmask=" << ThreadMaskOS(next_tmask, num_threads));
     warp.tmask = next_tmask;
     if (!next_tmask.any()) {
       active_warps_.reset(wid);

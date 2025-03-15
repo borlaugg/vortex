@@ -1,0 +1,4 @@
+make: Entering directory '/export/nethomes/rravi67/vortex/tests/regression/coop'
+Makefile:2: /export/nethomes/rravi67/vortex/config.mk: No such file or directory
+make: *** No rule to make target '/export/nethomes/rravi67/vortex/config.mk'.  Stop.
+make: Leaving directory '/export/nethomes/rravi67/vortex/tests/regression/coop'

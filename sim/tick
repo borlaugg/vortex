@@ -1,0 +1,10 @@
+simx/socket.cpp:    core->attach_ram(ram);
+simx/socket.cpp:    if (core->running())
+simx/socket.cpp:    exitcode |= core->get_exitcode();
+simx/cache_sim.cpp:			DT(3, simobject_->name() << "-core-" << core_req);
+simx/cache_sim.cpp:		DT(3, simobject_->name() << "-core-" << core_rsp);
+simx/cache_sim.cpp:		DT(3, simobject_->name() << "-core-" << core_req);
+simx/cache_sim.cpp:			DT(3, simobject_->name() << "-core-" << core_rsp);
+simx/cache_sim.cpp:						DT(3, simobject_->name() << "-core-" << core_rsp);
+simx/cache_sim.cpp:							DT(3, simobject_->name() << "-core-" << core_rsp);
+simx/cache_sim.cpp:								DT(3, simobject_->name() << "-core-" << core_rsp);

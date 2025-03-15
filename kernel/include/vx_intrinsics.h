@@ -36,6 +36,7 @@ extern "C" {
 #define RISCV_CUSTOM1   0x2B
 #define RISCV_CUSTOM2   0x5B
 #define RISCV_CUSTOM3   0x7B
+#define TILE   0x6B
 
 #define csr_read(csr) ({                        \
 	size_t __r;	               		            \
@@ -231,17 +232,17 @@ inline void vx_store(int val, int reg){
 
         case 1:
     __asm__ volatile (
-        "mv a1, %0" :: "r"(val) : "a1");  // Load immediate value 3 into a0(x10) register (rs1 = a)
+        "mv a1, %0" :: "r"(val) : "a1");  // Load immediate value 3 into a1(x11) register (rs1 = a)
         break;
         
         case 2:
     __asm__ volatile (
-        "mv a2, %0" :: "r"(val) : "a2");  // Load immediate value 3 into a0(x10) register (rs1 = a)
+        "mv a2, %0" :: "r"(val) : "a2");  // Load immediate value 3 into a2(x12) register (rs1 = a)
         break;
         
         case 3:
     __asm__ volatile (
-        "mv a3, %0" :: "r"(val) : "a3");  // Load immediate value 3 into a0(x10) register (rs1 = a)
+        "mv a3, %0" :: "r"(val) : "a3");  // Load immediate value 3 into a3(x13) register (rs1 = a)
         break;
         
         default:
@@ -266,7 +267,7 @@ inline void vx_shfl() {
  
 inline void vx_tile(unsigned int tile_mask, int thread_count) {
     __asm__ volatile (
-        ".insn r %0, 1, 0, x0, %1, %2" :: "i"(RISCV_CUSTOM3),"r"(tile_mask),"r"(thread_count));
+        ".insn r %0, 1, 0, x0, %1, %2" :: "i"(TILE),"r"(tile_mask),"r"(thread_count));
 }
 
 // mode: 0:ALL, 1:ANY, 2:UNI, 3:BALLOT
@@ -331,6 +332,45 @@ inline int vx_shfl_sync(int mode, int threadMask, int val, int b, int width)
 }
 
 
+
+inline int vx_vote_sync(int mode, int neg, int threadMask, int pred)
+{
+    int func3 = ((neg & 0x1) << 2) | (mode & 0x3);
+
+    int rs1 = pred;
+
+    int rd;
+
+    __asm__ volatile (
+        "addi a2, %[tm], 0\n\t"                    
+        ".insn i %[opcode], %[f3], %[rd], %[rs1], 12\n\t"
+        : [rd] "=r" (rd)
+        : [tm] "r" (threadMask),
+          [opcode] "i" (RISCV_CUSTOM1),
+          [f3] "i" (func3),
+          [rs1] "r" (rs1) 
+        : "a2"
+    );
+
+    return rd;
+}
+//Matrix load
+inline void vx_matrix_load(unsigned dest, unsigned  addr) 
+{
+    asm volatile (".insn i 0x7b, 0, x0, %0(%1)" :: "i"(dest), "r"(addr));
+}
+
+//Matrix Store
+inline void vx_matrix_store(unsigned  addr) 
+{
+    asm volatile (".insn i 0x7b, 1, x0, 0(%0)" :: "r"(addr));
+}
+
+//Matrix Mul
+inline void vx_matrix_mul() 
+{
+    asm volatile (".insn i 0x7b, 2, x0, 0(x0)");
+}
 
 #ifdef __cplusplus
 }

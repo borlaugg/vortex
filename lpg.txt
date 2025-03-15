@@ -1,0 +1,239 @@
+ 1014  git checkout cuda_VoteShfl 
+ 1015  git commit -a
+ 1016  git checkout cuda_VoteShfl 
+ 1017  git status
+ 1023  git diff cuda_coop 
+ 1024  git checkout cuda_coop 
+ 1025  git diff cuda_coop 
+ 1026  git checkout cuda_VoteShfl 
+ 1032  git commit -a
+ 1033  git status
+ 1034  git push -u origin cuda_VoteShfl 
+ 1035  git status
+ 1036  git push -u origin cuda_VoteShfl 
+ 1037  git branch
+ 1046  git status
+ 1047  git commit hw/rtl/VX_define.vh 
+ 1048  git push
+ 1049  git branch
+ 1050  git checkout cuda_coop 
+ 1056  git branch
+ 1065  git checkout cuda_VoteShfl 
+ 1071  git checkout cuda_coop 
+ 1157  git diff
+ 1163  git diff
+ 1164  git diff VX_gpr_slice.sv
+ 1165  git diff
+ 1166  git diff core/VX_gpr_slice.sv
+ 1250  git status
+ 1251  git commit -a
+ 1252  git status
+ 1253  git branch
+ 1254  git push -u cuda_coop
+ 1255  git push -u origin cuda_coop
+ 1256  git checkout cuda_VoteShfl 
+ 1271  git commit -a
+ 1272  git push
+ 1273  git checkout cuda_coop 
+ 1280  git commit -a
+ 1281  git push
+ 1282  git checkout cuda_VoteShfl 
+ 1283  git status
+ 1284  git commit hw/rtl/core/VX_alu_int.sv 
+ 1285  git push
+ 1286  git status
+ 1287  git push
+ 1288  git auth
+ 1289  git help
+ 1290  git branch
+ 1291  git log
+ 1292  git push
+ 1293  git status
+ 1294  git push
+ 1295  git checkout cuda_coop 
+ 1300  git checkout cuda_VoteShfl 
+ 1302  git checkout cuda_coop 
+ 1303  git checkout cuda_VoteShfl 
+ 1304  git checkout cuda_coop 
+ 1306  git status
+ 1307  git commit ../hw/rtl/core/VX_alu_int.sv 
+ 1308  git push
+ 1316  git branch
+ 1339  git checkout cuda_VoteShfl 
+ 1342  git branch
+ 1350  git checkout cuda_coop 
+ 1420  git branch
+ 1439  git checkout cuda_VoteShfl 
+ 1475  git branch
+ 1476  git checkout cuda_VoteShfl 
+ 1477  git commit -a
+ 1478  git checkout cuda_VoteShfl 
+ 1483  git branch
+ 1494  git status
+ 1496  git status
+ 1497  git commit hw/rtl/core/VX_alu_int.sv 
+ 1498  git commit kernel/include/vx_intrinsics.h 
+ 1499  git status
+ 1500  git commit tests/regression/vote/kernel.cpp 
+ 1501  git push
+ 1502  git checkout cuda_coop 
+ 1505  git branch
+ 1509  git status
+ 1510  git commit ../hw/rtl/core/VX_alu_int.sv 
+ 1511  git checkout cuda_VoteShfl 
+ 1513  git commit ../hw/rtl/core/VX_alu_int.sv 
+ 1514  git push
+ 1515  git checkout cuda_coop 
+ 1516  git branch
+ 1517  git status
+ 1518  git commit ../hw/rtl/core/VX_alu_int.sv 
+ 1519  git push
+ 1520  git branch
+ 1543  git checkout cuda_VoteShfl 
+ 1544  git commit -a
+ 1545  git checkout cuda_VoteShfl 
+ 1550  git checkout cuda_coop 
+ 1575  git branch
+ 1576  git checkout cuda_VoteShfl 
+ 1577  git commit -a
+ 1578  git checkout cuda_VoteShfl 
+ 1579  git status
+ 1580  git add tests/*
+ 1581  git status
+ 1582  git pull
+ 1583  git status
+ 1584  git commit -a
+ 1585  git status
+ 1586  git branch
+ 1587  git push
+ 1588  git pull origin master
+ 1606  git status
+ 1607  git add sim/simx/*
+ 1608  git status
+ 1609  git add hw/rtl/*
+ 1610  git status
+ 1611  git add tests/regression/Makefile 
+ 1612  git add kernel/include/vx_intrinsics.h 
+ 1613  git status
+ 1614  git commit
+ 1615  git status
+ 1671  git status
+ 1673  git submodule update --init --recursive
+ 1674  git status
+ 1675  git commit kernel/include/vx_intrinsics.h 
+ 1676  git push
+ 1677  git submodule deinit -f .
+ 1678  git submodule update --init --recursive
+ 1679  git submodule deinit -f .
+ 1680  git submodule update --init --recursive
+ 1681  git submodule sync --recursive
+ 1682  git submodule update --init --recursive
+ 1687  git submodule update --init --recursive
+ 1695  git pull main
+ 1696  git pull origin master
+ 1697  git pull
+ 1698  git pull main
+ 1708  git submodule update --init --recursive
+ 1718  git pull
+ 1719  git pull origin master
+ 1722  git pull
+ 1732  git pull origin master
+ 1734  git status
+ 1735  git commit -a
+ 1736  git status
+ 1737  git push
+ 1738  git pull origin master
+ 1745  git status
+ 1746  git ignore run.log
+ 1747  git status
+ 1748  git pull origin master
+ 1750  git branch
+ 1751  git branch cuda_VoteShfl2
+ 1752  git branch
+ 1753  git checkout cuda_VoteShfl2
+ 1754  git rebase master
+ 1755  git am --show-current-patch
+ 1756  git add sim/simx/types.h 
+ 1757  git rebase --continue
+ 1758  git add sim/simx/execute.cpp 
+ 1759  git rebase --continue
+ 1760  git add src/core.cpp 
+ 1761  git rebase --continue
+ 1762  git add src/test/matmul-mt.s 
+ 1763  git rebase --continue
+ 1764  git add src/instruction.cpp 
+ 1765  git rebase --continue
+ 1766  git add src/Makefile 
+ 1767  git rebase --continue
+ 1768  git rebase --skip
+ 1772  git status
+ 1773  git commit -a
+ 1774  git status
+ 1775  git rebase master
+ 1776  git rebase --continue
+ 1777  git status
+ 1778  git rebase --continue
+ 1779  git rebase --abort
+ 1780  git rebase master
+ 1781  git add sim/simx/types.h 
+ 1782  git rebase --continue
+ 1783  git add sim/simx/execute.cpp 
+ 1784  git rebase --continue
+ 1785  git rebase --skip
+ 1786  git rebase --skip 
+ 1787  git branch
+ 1788  git checkout cuda_VoteShfl
+ 1789  git log
+ 1790  git branch cuda_VoteShfl3 bfa5bbcf6e8a64ea012c7ffcb78d0b0121926bba
+ 1791  git branch
+ 1792  git checkout cuda_VoteShfl3
+ 1793  git status
+ 1794  git log
+ 1804  git merge master
+ 1805  git add hw/rtl/core/VX_alu_int.sv 
+ 1806  git merge master
+ 1807  git commit -a
+ 1808  git status
+ 1809  git commit -a
+ 1810  git status
+ 1811  git merge master
+ 1812  git commit -a
+ 1813  git log
+ 1814  git status
+ 1818  git submodule update --init --recursive
+ 1848  git rebase --continue
+ 1849  git log
+ 1850  git rebase --abort
+ 1851  git log
+ 1852  git checkout master 
+ 1853  git log
+ 1854  git pull
+ 1855  git log
+ 1941  git log
+ 1942  git status
+ 1943  git commit -a
+ 1944  git remote add fork https://github.com/borlaugg/vortex.git
+ 1945  git remote -v
+ 1946  git push fork cuda_VoteShfl3
+ 1947  git branch --list --all
+ 1948  git remote -c
+ 1949  git branch
+ 1950  git checkout cuda_coop
+ 1951  git diff cuda_coop cuda_VoteShfl3 hw/rtl/core/VX_alu_int.sv
+ 1952  git checkout cuda_VoteShfl3
+ 1953  git status
+ 1962  git status
+ 1963  git commit -a
+ 1964  git push fork cuda_VoteShfl3
+ 1965  history | grep "git " > /nethome/rravi67/vortex/build/a.txt
+ 1968  git commit -a
+ 1969  git push fork cuda_VoteShfl3
+ 1993  git status
+ 1994  git commit -a
+ 1995  git branch
+ 1996  git merge master
+ 1997  git push fork cuda_VoteShfl3
+ 2002  git branch
+ 2003  git checkout cuda_coop
+ 2004  git reflog
+ 2005  history | grep "git " > ./lpg.txt
