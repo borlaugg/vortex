@@ -855,11 +855,6 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         rddata[t].i = sext((Word)read_data, data_width);
         break;
       case 2:
-        if (opcode == Opcode::L) {
-          // RV32I: LW
-          rddata[t].i = sext((Word)read_data, data_width);
-          break;
-        case 2:
           if (opcode == Opcode::L) {
             // RV32I: LW
             rddata[t].i = sext((Word)read_data, data_width);
@@ -887,7 +882,6 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     }
   #endif
     break;
-  }
   case Opcode::S:
   case Opcode::FS: {
     trace->fu_type = FUType::LSU;
@@ -1952,6 +1946,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     
   }
   break;
+#endif
   case Opcode::TCU:
   { //TODO - make it data-type flexible
     uint32_t mem_bytes = 1;
@@ -2014,7 +2009,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 
         for (uint32_t t = thread_start; t < num_threads_actv; ++t)
         {
-          if (!warp.tmask.test(t))
+          if (!warp[wid].tmask.test(t))
             continue;
           DP(3, "Thread ID" << t);
 
@@ -2026,7 +2021,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           DP(3, "n_tiles = " << n_tiles << "; num_data_per_thread = " << num_data_per_thread <<std::endl);
             for (int n=0; n<num_data_per_thread; n++)
             {
-              Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+              Word* temp_ref = &(warp[wid].ireg_file.at(t).at(rsrc0));
               this->dcache_read(temp_ref, (base_addr+(n*mem_bytes)+(loop_offset*mem_bytes)), mem_bytes);
 
               scratchpad[loop_offset + (immsrc*(n_tiles)*tc_size*tc_size) + (t*num_data_per_thread) + n] = *temp_ref;
@@ -2046,7 +2041,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 
         for (uint32_t t = thread_start; t < num_threads_actv_st; ++t)
         {
-          if (!warp.tmask.test(t))
+          if (!warp[wid].tmask.test(t))
             continue;
 
           DP(3, "Thread ID" << t);
@@ -2057,7 +2052,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           //Store C
           for (int n=0; n<num_data_per_thread_st; n++)
           {
-            Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+            Word* temp_ref = &(warp[wid].ireg_file.at(t).at(rsrc0));
             *temp_ref = scratchpad[(n_tiles*tc_size*tc_size*2) + (t*num_data_per_thread_st) + n];
 
             this->dcache_write(temp_ref, base_addr+(n*mem_bytes), mem_bytes);
@@ -2078,7 +2073,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         uint32_t threads_per_tc = MAX (1, num_threads/TC_per_warp);
         for (uint32_t t = thread_start; t < num_threads_actv; ++t)
         {
-          if (!warp.tmask.test(t))
+          if (!warp[wid].tmask.test(t))
             continue;
 
           DP(3, "Thread ID" << t);

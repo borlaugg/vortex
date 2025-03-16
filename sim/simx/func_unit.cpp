@@ -54,10 +54,6 @@ void AluUnit::tick() {
 		case AluType::SHFL:
 			output.push(trace, 1);
 			break;
-		case AluType::VOTE: 
-		case AluType::SHFL:
-			output.push(trace, 1);
-			break;
 		default:
 			std::abort();
 		}

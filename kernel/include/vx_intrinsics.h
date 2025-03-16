@@ -331,29 +331,6 @@ inline int vx_shfl_sync(int mode, int threadMask, int val, int b, int width)
     return rd;
 }
 
-
-
-inline int vx_vote_sync(int mode, int neg, int threadMask, int pred)
-{
-    int func3 = ((neg & 0x1) << 2) | (mode & 0x3);
-
-    int rs1 = pred;
-
-    int rd;
-
-    __asm__ volatile (
-        "addi a2, %[tm], 0\n\t"                    
-        ".insn i %[opcode], %[f3], %[rd], %[rs1], 12\n\t"
-        : [rd] "=r" (rd)
-        : [tm] "r" (threadMask),
-          [opcode] "i" (RISCV_CUSTOM1),
-          [f3] "i" (func3),
-          [rs1] "r" (rs1) 
-        : "a2"
-    );
-
-    return rd;
-}
 //Matrix load
 inline void vx_matrix_load(unsigned dest, unsigned  addr) 
 {

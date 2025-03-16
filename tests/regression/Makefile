@@ -17,16 +17,8 @@ all:
 	$(MAKE) -C sgemm2x
 	$(MAKE) -C vote
 	$(MAKE) -C shfl
-<<<<<<< HEAD
 	$(MAKE) -C coop
-	$(MAKE) -C cg_mse_cm_hw
-	$(MAKE) -C cg_mse_tm_hw
-	$(MAKE) -C warp_reduce_max_hw
-	$(MAKE) -C reduce3_hw
-	$(MAKE) -C reduce4_hw
-=======
 	$(MAKE) -C stencil3d
->>>>>>> cuda_VoteShfl3
 
 run-simx:
 	$(MAKE) -C basic run-simx
@@ -44,16 +36,8 @@ run-simx:
 	$(MAKE) -C sgemm2x run-simx
 	$(MAKE) -C vote run-simx
 	$(MAKE) -C shfl run-simx
-<<<<<<< HEAD
 	$(MAKE) -C coop run-simx
-	$(MAKE) -C cg_mse_cm_hw run-simx
-	$(MAKE) -C cg_mse_tm_hw run-simx
-	$(MAKE) -C warp_reduce_max_hw run-simx
-	$(MAKE) -C reduce3_hw run-simx
-	$(MAKE) -C reduce4_hw run-simx
-=======
 	$(MAKE) -C stencil3d run-simx
->>>>>>> cuda_VoteShfl3
 
 run-rtlsim:
 	$(MAKE) -C basic run-rtlsim
@@ -90,13 +74,5 @@ clean:
 	$(MAKE) -C sgemm2x clean
 	$(MAKE) -C vote clean
 	$(MAKE) -C shfl clean
-<<<<<<< HEAD
 	$(MAKE) -C coop clean
-	$(MAKE) -C cg_mse_cm_hw clean
-	$(MAKE) -C cg_mse_tm_hw clean
-	$(MAKE) -C warp_reduce_max_hw clean
-	$(MAKE) -C reduce3_hw clean
-	$(MAKE) -C reduce4_hw clean
-=======
 	$(MAKE) -C stencil3d clean
->>>>>>> cuda_VoteShfl3

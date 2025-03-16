@@ -275,10 +275,7 @@ inline std::ostream &operator<<(std::ostream &os, const SfuType& type) {
   case SfuType::CSRRW:  os << "CSRRW"; break;
   case SfuType::CSRRS:  os << "CSRRS"; break;
   case SfuType::CSRRC:  os << "CSRRC"; break;
-<<<<<<< HEAD
   case SfuType::TILE:  os << "TILE"; break;
-=======
->>>>>>> cuda_VoteShfl3
   default: assert(false);
   }
   return os;
