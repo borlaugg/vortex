@@ -115,7 +115,6 @@
 `define INST_EXT1       7'b0001011 // 0x0B
 `define INST_EXT2       7'b0101011 // 0x2B Vote
 `define INST_EXT3       7'b1011011 // 0x5B Shfl
-`define TILE            7'b1001011 // 0x6B TILE
 `define INST_EXT4       7'b1111011 // 0x7B
 
 // CUDA Vote Extension
@@ -276,7 +275,6 @@
 `define INST_SFU_CSRRW       4'h6
 `define INST_SFU_CSRRS       4'h7
 `define INST_SFU_CSRRC       4'h8
-`define INST_SFU_TILE        4'h9
 `define INST_SFU_BITS        4
 `define INST_SFU_CSR(f3)     (4'h6 + 4'(f3) - 4'h1)
 `define INST_SFU_IS_WCTL(op) (op <= 5)

@@ -21,7 +21,6 @@ module VX_alu_unit #(
 
     // Inputs
     VX_dispatch_if.slave    dispatch_if [`ISSUE_WIDTH],
-    VX_sched_csr_if.slave   sched_csr_if,
 
     // Outputs
     VX_commit_if.master     commit_if [`ISSUE_WIDTH],

@@ -94,9 +94,6 @@ module VX_schedule import VX_gpu_pkg::*; #(
     reg [`NC_WIDTH-1:0] gbar_req_size_m1;
 `endif
 
-    // tile
-    reg [`NUM_WARPS-1:0][7:0] numThreads, numThreads_n;
-
     // wspawn
     wspawn_t wspawn;
     reg [`NW_WIDTH-1:0] wspawn_wid;
@@ -113,7 +110,6 @@ module VX_schedule import VX_gpu_pkg::*; #(
         barrier_ctrs_n  = barrier_ctrs;
         barrier_stalls_n= barrier_stalls;
         warp_pcs_n      = warp_pcs;
-        numThreads_n    = numThreads;
 
         // decode unlock
         if (decode_sched_if.valid && decode_sched_if.unlock) begin
@@ -161,14 +157,6 @@ module VX_schedule import VX_gpu_pkg::*; #(
                 thread_masks_n[join_wid] = join_tmask;
             end
             stalled_warps_n[join_wid] = 0; // unlock warp
-        end
-
-        // Tile handling
-        if(warp_ctl_if.valid && warp_ctl_if.tile.valid) begin
-            active_warps_n = warp_ctl_if.tile.wmask;
-            for (integer i = 0; i < `NUM_WARPS; ++i) begin
-                numThreads_n[i] = warp_ctl_if.tile.numThreads[i];
-            end
         end
 
         // barrier handling
@@ -236,14 +224,12 @@ module VX_schedule import VX_gpu_pkg::*; #(
             barrier_stalls  <= '0;
             cycles          <= '0;
             wspawn.valid    <=  0;
-            numThreads[0]   <= '0;
 
             // activate first warp
             warp_pcs[0]     <= base_dcrs.startup_addr[1 +: `PC_BITS];
             active_warps[0] <= 1;
             thread_masks[0][0] <= 1;
             is_single_warp  <= 1;
-            numThreads[0]   <= `NUM_THREADS;
         end else begin
             active_warps   <= active_warps_n;
             stalled_warps  <= stalled_warps_n;
@@ -253,7 +239,6 @@ module VX_schedule import VX_gpu_pkg::*; #(
             barrier_ctrs   <= barrier_ctrs_n;
             barrier_stalls <= barrier_stalls_n;
             is_single_warp <= (active_warps_cnt == $bits(active_warps_cnt)'(1));
-            numThreads     <= numThreads_n;
 
             // wspawn handling
             if (warp_ctl_if.valid && warp_ctl_if.wspawn.valid) begin
@@ -403,7 +388,6 @@ module VX_schedule import VX_gpu_pkg::*; #(
     assign sched_csr_if.cycles = cycles;
     assign sched_csr_if.active_warps = active_warps;
     assign sched_csr_if.thread_masks = thread_masks;
-    assign sched_csr_if.numThreads = numThreads;
 
    // timeout handling
     reg [31:0] timeout_ctr;

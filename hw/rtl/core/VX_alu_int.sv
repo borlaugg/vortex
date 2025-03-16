@@ -23,7 +23,6 @@ module VX_alu_int #(
 
     // Inputs
     VX_execute_if.slave     execute_if,
-    VX_sched_csr_if.slave   sched_csr_if,
 
     // Outputs
     VX_commit_if.master     commit_if,
@@ -119,9 +118,6 @@ module VX_alu_int #(
     end
 
     // VOTE 
-    wire [2:0] wid   = (execute_if.data.wid);
-    wire [7:0] numThreads = sched_csr_if.numThreads[$signed(wid)];
-
     wire [NUM_LANES-1:0] active_t = (alu_in2[0][NUM_LANES-1:0] & (execute_if.data.tmask));
     wire [NUM_LANES-1:0] is_pred;
     wire [NUM_LANES-1:0] vote_in = (is_pred & active_t);
@@ -143,7 +139,6 @@ module VX_alu_int #(
             endcase
         end
     end
-
 
     // SHFL
     wire [NUM_LANES-1:0][`XLEN-1:0] b; 
@@ -247,7 +242,6 @@ module VX_alu_int #(
     );
 
     `UNUSED_VAR (br_op_r)
-    `UNUSED_VAR (sched_csr_if.numThreads)
     wire is_br_neg  = `INST_BR_IS_NEG(br_op_r);
     wire is_br_less = `INST_BR_IS_LESS(br_op_r);
     wire is_br_static = `INST_BR_IS_STATIC(br_op_r);
