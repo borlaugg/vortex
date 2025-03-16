@@ -31,8 +31,8 @@
 #endif
 #include "VX_types.h"
 
-// #define DEFAULT
-#define GROUPS
+#define DEFAULT
+// #define GROUPS
 
 using namespace vortex;
 
@@ -2009,8 +2009,13 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 
         for (uint32_t t = thread_start; t < num_threads_actv; ++t)
         {
+#ifdef GROUPS
           if (!warp[wid].tmask.test(t))
             continue;
+#else
+          if (!warp.tmask.test(t))
+            continue;
+#endif
           DP(3, "Thread ID" << t);
 
           uint32_t base_addr = rsdata[t][0].i ;
@@ -2021,7 +2026,11 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           DP(3, "n_tiles = " << n_tiles << "; num_data_per_thread = " << num_data_per_thread <<std::endl);
             for (int n=0; n<num_data_per_thread; n++)
             {
+#ifdef GROUPS
               Word* temp_ref = &(warp[wid].ireg_file.at(t).at(rsrc0));
+#else
+              Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+#endif
               this->dcache_read(temp_ref, (base_addr+(n*mem_bytes)+(loop_offset*mem_bytes)), mem_bytes);
 
               scratchpad[loop_offset + (immsrc*(n_tiles)*tc_size*tc_size) + (t*num_data_per_thread) + n] = *temp_ref;
@@ -2041,9 +2050,13 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 
         for (uint32_t t = thread_start; t < num_threads_actv_st; ++t)
         {
+#ifdef GROUPS
           if (!warp[wid].tmask.test(t))
             continue;
-
+#else
+          if (!warp.tmask.test(t))
+            continue;
+#endif
           DP(3, "Thread ID" << t);
           uint32_t base_addr = rsdata[t][0].i ;
 
@@ -2052,7 +2065,11 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
           //Store C
           for (int n=0; n<num_data_per_thread_st; n++)
           {
+#ifdef GROUPS
             Word* temp_ref = &(warp[wid].ireg_file.at(t).at(rsrc0));
+#else
+            Word* temp_ref = &(warp.ireg_file.at(t).at(rsrc0));
+#endif
             *temp_ref = scratchpad[(n_tiles*tc_size*tc_size*2) + (t*num_data_per_thread_st) + n];
 
             this->dcache_write(temp_ref, base_addr+(n*mem_bytes), mem_bytes);
@@ -2073,8 +2090,13 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         uint32_t threads_per_tc = MAX (1, num_threads/TC_per_warp);
         for (uint32_t t = thread_start; t < num_threads_actv; ++t)
         {
+#ifdef GROUPS
           if (!warp[wid].tmask.test(t))
             continue;
+#else
+          if (!warp.tmask.test(t))
+            continue;
+#endif
 
           DP(3, "Thread ID" << t);
           //TC operation [only 1 thread in 1 warp needs to do this]

@@ -246,7 +246,7 @@ instr_trace_t* Emulator::step() {
 
 #ifdef DEFAULT
   DP(5, "Register state:");
-  for (uint32_t i = 0; i < arch_.num_regs(); ++i) {
+  for (uint32_t i = 0; i < MAX_NUM_REGS; ++i) {
     DPN(5, "  %r" << std::setfill('0') << std::setw(2) << std::dec << i << ':');
     //-----  Integer register file
     for (uint32_t j = 0; j < arch_.num_threads(); ++j) {
@@ -264,7 +264,7 @@ instr_trace_t* Emulator::step() {
 
 #ifdef GROUPS
   DP(5, "Register state:");
-  for (uint32_t i = 0; i < arch_.num_regs(); ++i) {
+  for (uint32_t i = 0; i < MAX_NUM_REGS; ++i) {
     DPN(5, "  %r" << std::setfill('0') << std::setw(2) << std::dec << i << ':');
     //-----  Integer register file
     for (uint32_t j = 0; j < WARP_SIZE; ++j) {
