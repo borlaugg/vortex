@@ -28,6 +28,9 @@
 #include "processor_impl.h"
 #include "local_mem.h"
 
+
+#define DEFAULT
+
 using namespace vortex;
 
 Emulator::warp_t::warp_t(const Arch& arch)
