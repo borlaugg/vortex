@@ -153,8 +153,10 @@ void Emulator::clear() {
   //activate first warp and thread
   active_warps_.set(0);
   warps_[0].tmask.set(0);
+#ifdef GROUPS
   warps_[0].isActive = true;
   wspawn_.valid = false;
+#endif
 
   for (auto& reg : scratchpad) {
     reg = 0;
@@ -179,6 +181,8 @@ instr_trace_t* Emulator::step() {
     for (uint32_t i = 1; i < wspawn_.num_warps; ++i) {
 #ifdef GROUPS
       auto& warp = warps_.at(i*MAX_NUMBER_TILES);
+      active_sub_warps_[i].set(0);
+      stalled_sub_warps_[i].reset();
 #else
       auto& warp = warps_.at(i);
 #endif
