@@ -96,9 +96,10 @@ Emulator::Emulator(const Arch &arch, const DCRS &dcrs, Core* core)
     , core_(core)
 #ifdef DEFAULT
     , warps_(arch.num_warps(), arch)
-#endif
-#ifdef GROUPS
+#else
     , warps_(MAX_NUMBER_TILES*arch.num_warps(), arch)
+    , active_sub_warps_(arch.num_warps())
+    , stalled_sub_warps_(arch.num_warps())
 #endif
     , barriers_(arch.num_barriers(), 0)
     , ipdom_size_(arch.num_threads()-1)
@@ -387,24 +388,33 @@ bool Emulator::barrier(uint32_t bar_id, uint32_t count, uint32_t wid) {
     return true;
 
   uint32_t bar_idx = bar_id & 0x7fffffff;
+  bool is_global = (bar_id >> 31);
 
   auto& barrier = barriers_.at(bar_idx);
-  if (warps_[wid].isActive) {
+  if (warps_[wid*MAX_NUMBER_TILES].isActive) {
     barrier.set(wid);
     DP(3, "*** Suspend core #" << core_->id() << ", warp #" << wid << " at barrier #" << bar_idx);
   }
 
-  
-  if (barrier.count() == (size_t)count) {
-    // resume suspended warps
-    for (uint32_t i = 0; i < MAX_NUMBER_TILES; ++i) {
-      if (barrier.test(i)) {
-        DP(3, "*** Resume core #" << core_->id() << ", warp #" << i << " at barrier #" << bar_idx);
-        warps_[i].isActive = true;
-      }
+  if (is_global) {
+    // global barrier handling
+    if (barrier.count() == active_warps_.count()) {
+      core_->socket()->barrier(bar_idx, count, core_->id());
+      barrier.reset();
     }
-    stalled_warps_.reset(0);
-    barrier.reset();
+  }
+  else{
+    if (barrier.count() == (size_t)count) {
+      // resume suspended warps
+      for (uint32_t i = 0; i < MAX_NUMBER_TILES; ++i) {
+        if (barrier.test(i)) {
+          DP(3, "*** Resume core #" << core_->id() << ", warp #" << i << " at barrier #" << bar_idx);
+          warps_[i].isActive = true;
+        }
+      }
+      stalled_warps_.reset(0);
+      barrier.reset();
+    }
   }
   return false;
 #endif
