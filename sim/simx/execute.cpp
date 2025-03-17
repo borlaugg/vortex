@@ -31,8 +31,8 @@
 #endif
 #include "VX_types.h"
 
-#define DEFAULT
-// #define GROUPS
+// #define DEFAULT
+#define GROUPS
 
 using namespace vortex;
 

@@ -59,10 +59,10 @@ typedef std::bitset<MAX_NUM_WARPS>   WarpMask;
 
 // Cooperative Groups /////////////////////////////////////////////////////////
 
-#define THREAD_PER_TILE     4
+#define THREAD_PER_TILE     1
 #define WARP_SIZE           32
-#define MAX_NUMBER_TILES    8
-#define BITS_MAX_TILES      3
+#define MAX_NUMBER_TILES    32
+#define BITS_MAX_TILES      5 //log2(MAX_NUMBER_TILES)
 
 ///////////////////////////////////////////////////////////////////////////////
 

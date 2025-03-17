@@ -29,7 +29,8 @@
 #include "local_mem.h"
 
 
-#define DEFAULT
+// #define DEFAULT
+#define GROUPS
 
 using namespace vortex;
 
@@ -97,7 +98,7 @@ Emulator::Emulator(const Arch &arch, const DCRS &dcrs, Core* core)
     , warps_(arch.num_warps(), arch)
 #endif
 #ifdef GROUPS
-    , warps_(MAX_NUMBER_TILES, arch)
+    , warps_(MAX_NUMBER_TILES*arch.num_warps(), arch)
 #endif
     , barriers_(arch.num_barriers(), 0)
     , ipdom_size_(arch.num_threads()-1)
@@ -175,7 +176,11 @@ instr_trace_t* Emulator::step() {
   if (wspawn_.valid && active_warps_.count() == 1) {
     DP(3, "*** Activate " << (wspawn_.num_warps-1) << " warps at PC: " << std::hex << wspawn_.nextPC << std::dec);
     for (uint32_t i = 1; i < wspawn_.num_warps; ++i) {
+#ifdef GROUPS
+      auto& warp = warps_.at(i*MAX_NUMBER_TILES);
+#else
       auto& warp = warps_.at(i);
+#endif
       warp.PC = wspawn_.nextPC;
       warp.tmask.set(0);
       active_warps_.set(i);
@@ -197,7 +202,11 @@ instr_trace_t* Emulator::step() {
     return nullptr;
 
   //----- suspend warp until decode
+#ifdef GROUPS
+  auto& warp = warps_.at(scheduled_warp*MAX_NUMBER_TILES);
+#else
   auto& warp = warps_.at(scheduled_warp);
+#endif
   assert(warp.tmask.any());
 
 #ifndef NDEBUG
@@ -236,9 +245,9 @@ instr_trace_t* Emulator::step() {
   this->execute(*instr, scheduled_warp, trace);
 #endif
 #ifdef GROUPS 
-  for (size_t wid = 0, nw = MAX_NUMBER_TILES; wid < nw; ++wid) {
+  for (size_t wid = scheduled_warp*MAX_NUMBER_TILES, nw = (scheduled_warp+1)*MAX_NUMBER_TILES; wid < nw; ++wid) {
     if (warps_[wid].isActive) {
-      DP(5, "EXECUTING Group ID:"<<wid);
+      DP(5,"Warp ID:"<< scheduled_warp <<" EXECUTING Group ID:"<<wid - scheduled_warp*MAX_NUMBER_TILES);
       this->execute(*instr, wid, trace);
     }
   }
