@@ -28,10 +28,6 @@
 #include "processor_impl.h"
 #include "local_mem.h"
 
-
-// #define DEFAULT
-#define GROUPS
-
 using namespace vortex;
 
 Emulator::warp_t::warp_t(const Arch& arch)
@@ -48,8 +44,11 @@ void Emulator::warp_t::clear(uint64_t startup_addr) {
   this->tmask.reset();
   this->uuid = 0;
   this->fcsr = 0;
+#ifdef GROUPS
   this->num_tThreads = WARP_SIZE;
   this->isActive = false;
+  this->isStalled = false;
+#endif
 
   for (auto& reg_file : this->ireg_file) {
     for (auto& reg : reg_file) {
@@ -98,8 +97,6 @@ Emulator::Emulator(const Arch &arch, const DCRS &dcrs, Core* core)
     , warps_(arch.num_warps(), arch)
 #else
     , warps_(MAX_NUMBER_TILES*arch.num_warps(), arch)
-    , active_sub_warps_(arch.num_warps())
-    , stalled_sub_warps_(arch.num_warps())
 #endif
     , barriers_(arch.num_barriers(), 0)
     , ipdom_size_(arch.num_threads()-1)
@@ -155,8 +152,9 @@ void Emulator::clear() {
   warps_[0].tmask.set(0);
 #ifdef GROUPS
   warps_[0].isActive = true;
-  wspawn_.valid = false;
+  warps_[0].isStalled = false;
 #endif
+  wspawn_.valid = false;
 
   for (auto& reg : scratchpad) {
     reg = 0;
@@ -181,19 +179,19 @@ instr_trace_t* Emulator::step() {
     for (uint32_t i = 1; i < wspawn_.num_warps; ++i) {
 #ifdef GROUPS
       auto& warp = warps_.at(i*MAX_NUMBER_TILES);
-      active_sub_warps_[i].set(0);
-      stalled_sub_warps_[i].reset();
+      warp.isActive = true;
+      warp.isStalled = false;
 #else
       auto& warp = warps_.at(i);
 #endif
       warp.PC = wspawn_.nextPC;
       warp.tmask.set(0);
       active_warps_.set(i);
+      DP(1,"Active warps:"<<active_warps_[i]);
     }
     wspawn_.valid = false;
     stalled_warps_.reset(0);
   }
-
   //----- find next ready warp
   for (size_t wid = 0, nw = arch_.num_warps(); wid < nw; ++wid) {
     bool warp_active = active_warps_.test(wid);
@@ -251,7 +249,7 @@ instr_trace_t* Emulator::step() {
 #endif
 #ifdef GROUPS 
   for (size_t wid = scheduled_warp*MAX_NUMBER_TILES, nw = (scheduled_warp+1)*MAX_NUMBER_TILES; wid < nw; ++wid) {
-    if (warps_[wid].isActive) {
+    if (warps_[wid].isActive && !warps_[wid].isStalled) {
       DP(5,"Warp ID:"<< scheduled_warp <<" EXECUTING Group ID:"<<wid - scheduled_warp*MAX_NUMBER_TILES);
       this->execute(*instr, wid, trace);
     }
@@ -281,13 +279,13 @@ instr_trace_t* Emulator::step() {
   for (uint32_t i = 0; i < MAX_NUM_REGS; ++i) {
     DPN(5, "  %r" << std::setfill('0') << std::setw(2) << std::dec << i << ':');
     //-----  Integer register file
-    for (uint32_t j = 0; j < WARP_SIZE; ++j) {
-      DPN(5, ' ' << std::setfill('0') << std::setw(XLEN/4) << std::hex << warps_[j/THREAD_PER_TILE].ireg_file.at(j%THREAD_PER_TILE).at(i) << std::setfill(' ') << ' ');
+    for (uint32_t j = scheduled_warp*WARP_SIZE; j < (scheduled_warp+1)*WARP_SIZE; ++j) {
+      DPN(5, ' ' << std::setfill('0') << std::setw(XLEN/4) << warps_[j/THREAD_PER_TILE].ireg_file.at(j%THREAD_PER_TILE).at(i) << std::setfill(' ') << ' ');
     }
     DPN(5, '|');
     //-----  Floating point register file
     for (uint32_t j = 0; j < arch_.num_threads(); ++j) {
-      DPN(5, ' ' << std::setfill('0') << std::setw(16) << std::hex << warps_[j/THREAD_PER_TILE].freg_file.at(j%THREAD_PER_TILE).at(i) << std::setfill(' ') << ' ');
+      DPN(5, ' ' << std::setfill('0') << std::setw(16) << warps_[j/THREAD_PER_TILE].freg_file.at(j%THREAD_PER_TILE).at(i) << std::setfill(' ') << ' ');
     }
     DPN(5, std::endl);
   }
@@ -305,10 +303,12 @@ int Emulator::get_exitcode() const {
 
 void Emulator::suspend(uint32_t wid) {
   assert(!stalled_warps_.test(wid));
+  DP(3,"Stalling Warp:" << wid);
   stalled_warps_.set(wid);
 }
 
 void Emulator::resume(uint32_t wid) {
+  DP(3,"Resuming Warp:" << wid);
   if (wid != 0xffffffff) {
     assert(stalled_warps_.test(wid));
     stalled_warps_.reset(wid);
@@ -327,6 +327,7 @@ bool Emulator::wspawn(uint32_t num_warps, Word nextPC) {
   return false;
 }
 
+#ifdef GROUPS
 bool Emulator::tileMask(uint32_t tile_mask, uint32_t thread_count){
   int wid = 0;
   bool reset = ~(tile_mask >> 31);
@@ -334,11 +335,13 @@ bool Emulator::tileMask(uint32_t tile_mask, uint32_t thread_count){
     auto mask = (tile_mask >> i) & 0x01;
     if(reset){
       warps_[MAX_NUMBER_TILES - i -1].isActive = mask;
+      warps_[MAX_NUMBER_TILES - i -1].isStalled = !mask;
     }
     if(mask){
       wid = MAX_NUMBER_TILES - i - 1;
       if(!reset){
         warps_[wid].isActive = mask;
+        warps_[MAX_NUMBER_TILES - i -1].isStalled = !mask;
       }
       warps_[wid].PC = warps_[0].PC;
       warps_[wid].tmask.reset();
@@ -350,6 +353,7 @@ bool Emulator::tileMask(uint32_t tile_mask, uint32_t thread_count){
   }
   return true;
 }
+#endif
 
 bool Emulator::barrier(uint32_t bar_id, uint32_t count, uint32_t wid) {
 #ifdef DEFAULT
@@ -395,7 +399,7 @@ bool Emulator::barrier(uint32_t bar_id, uint32_t count, uint32_t wid) {
   bool is_global = (bar_id >> 31);
 
   auto& barrier = barriers_.at(bar_idx);
-  if (warps_[wid*MAX_NUMBER_TILES].isActive) {
+  if (warps_[wid*MAX_NUMBER_TILES].isActive && !warps_[wid*MAX_NUMBER_TILES].isStalled) {
     barrier.set(wid);
     DP(3, "*** Suspend core #" << core_->id() << ", warp #" << wid << " at barrier #" << bar_idx);
   }
@@ -410,10 +414,11 @@ bool Emulator::barrier(uint32_t bar_id, uint32_t count, uint32_t wid) {
   else{
     if (barrier.count() == (size_t)count) {
       // resume suspended warps
-      for (uint32_t i = 0; i < MAX_NUMBER_TILES; ++i) {
+      for (uint32_t i = 0; i < arch_.num_warps(); ++i) {
         if (barrier.test(i)) {
           DP(3, "*** Resume core #" << core_->id() << ", warp #" << i << " at barrier #" << bar_idx);
-          warps_[i].isActive = true;
+          warps_[i*MAX_NUMBER_TILES].isActive = true;
+          warps_[i*MAX_NUMBER_TILES].isStalled = true;
         }
       }
       stalled_warps_.reset(0);
@@ -636,7 +641,11 @@ Word Emulator::get_csr(uint32_t addr, uint32_t tid, uint32_t wid) {
 
   case VX_CSR_MHARTID:    return (core_->id() * arch_.num_warps() + wid) * arch_.num_threads() + tid;
   case VX_CSR_THREAD_ID:  return tid;
+  #ifdef GROUPS
+  case VX_CSR_WARP_ID:    return uint32_t(wid/MAX_NUMBER_TILES);
+  #else
   case VX_CSR_WARP_ID:    return wid;
+  #endif
   case VX_CSR_CORE_ID:    return core_->id();
   case VX_CSR_ACTIVE_THREADS:return warps_.at(wid).tmask.to_ulong();
   case VX_CSR_ACTIVE_WARPS:return active_warps_.to_ulong();

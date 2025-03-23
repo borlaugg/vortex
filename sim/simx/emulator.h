@@ -14,7 +14,8 @@
 #ifndef __WARP_H
 #define __WARP_H
 
-#define GROUPS
+// #define GROUPS
+#define DEFAULT
 
 #include <vector>
 #include <sstream>
@@ -125,6 +126,7 @@ private:
 #ifdef GROUPS
     uint32_t                          num_tThreads;
     bool                              isActive;
+    bool                              isStalled;
 #endif
   };
 
@@ -174,10 +176,6 @@ private:
   WarpMask    active_warps_;
   WarpMask    stalled_warps_;
   std::vector<WarpMask> barriers_;
-#ifdef GROUPS
-  std::vector<WarpMask>    active_sub_warps_;
-  std::vector<WarpMask>    stalled_sub_warps_;
-#endif
   std::unordered_map<int, std::stringstream> print_bufs_;
   MemoryUnit  mmu_;
   uint32_t    ipdom_size_;

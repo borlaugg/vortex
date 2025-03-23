@@ -31,8 +31,6 @@
 #endif
 #include "VX_types.h"
 
-// #define DEFAULT
-#define GROUPS
 
 using namespace vortex;
 
@@ -69,7 +67,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   trace->tmask = warp.tmask;
 #endif
 #ifdef GROUPS
-  trace->wid   = 0;
+  trace->wid   = uint32_t(wid/MAX_NUMBER_TILES);
   trace->PC    = warp[wid].PC;
   trace->tmask = warp[wid].tmask;
 #endif
@@ -1523,6 +1521,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         for (uint32_t t = 0; t < num_threads; ++t) {
           next_tmask.set(t, rsdata.at(thread_last)[0].i & (1 << t));
         }
+        DP(1,"Next_MASL:"<<num_threads << " "<< thread_last);
       } break;
       case 1: {
         // WSPAWN
@@ -2242,7 +2241,6 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     DP(3, "*** Next PC=0x" << std::hex << next_pc << std::dec);
     warp[wid].PC = next_pc;
   }
-  warp[0].PC = warp[wid].PC;
 #endif
 #ifdef DEFAULT
   if (warp.tmask != next_tmask) {
@@ -2261,7 +2259,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
     DPN(3, std::endl);
     warp[wid].tmask = next_tmask;
     if (!next_tmask.any()) {
-      active_warps_.reset(wid);
+      active_warps_.reset(wid/MAX_NUMBER_TILES);
     }
   }
 #endif
