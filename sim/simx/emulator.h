@@ -14,8 +14,8 @@
 #ifndef __WARP_H
 #define __WARP_H
 
-// #define GROUPS
-#define DEFAULT
+#define GROUPS
+// #define DEFAULT
 
 #include <vector>
 #include <sstream>

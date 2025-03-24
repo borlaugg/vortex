@@ -19,7 +19,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <VX_types.h>
+#include <VX_types.h> 
 #include <vx_print.h>
 
 #if defined(__clang__)
@@ -264,12 +264,12 @@ inline void vx_shfl() {
         ".insn i %0, 3, x14, x13, 1067" :: "i"(RISCV_CUSTOM2)); //(c(01)+b(00001)+membermask(address(01011)))
        //".insn i opcode6, func3, rd, rs1, simm12"
 }
- 
+  
 inline void vx_tile(unsigned int tile_mask, int thread_count) {
     __asm__ volatile (
         ".insn r %0, 1, 0, x0, %1, %2" :: "i"(TILE),"r"(tile_mask),"r"(thread_count));
 }
-
+    
 // mode: 0:ALL, 1:ANY, 2:UNI, 3:BALLOT
 inline int vx_vote_sync(int pred,
                              int neg,

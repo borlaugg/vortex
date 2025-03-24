@@ -68,7 +68,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #endif
 #ifdef GROUPS
   trace->wid   = uint32_t(wid/MAX_NUMBER_TILES);
-  trace->PC    = warp[wid].PC;
+  trace->PC    = warp[wid/MAX_NUMBER_TILES].PC;
   trace->tmask = warp[wid].tmask;
 #endif
   trace->dst_reg = {instr.getRDType(), instr.getRDest()};
@@ -218,15 +218,11 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #ifdef DEFAULT
       if (!warp.tmask.test(t))
         continue;
+      rddata[t].i = immsrc + warp.PC;
 #endif
 #ifdef GROUPS
       if (!warp[wid].tmask.test(t))
         continue;
-#endif
-#ifdef DEFAULT
-      rddata[t].i = immsrc + warp.PC;
-#endif
-#ifdef GROUPS
       rddata[t].i = immsrc + warp[wid].PC;
 #endif
     }
@@ -1521,7 +1517,6 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
         for (uint32_t t = 0; t < num_threads; ++t) {
           next_tmask.set(t, rsdata.at(thread_last)[0].i & (1 << t));
         }
-        DP(1,"Next_MASL:"<<num_threads << " "<< thread_last);
       } break;
       case 1: {
         // WSPAWN
@@ -2229,6 +2224,7 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
 #endif
 #ifdef GROUPS
   warp[wid].PC += 4;
+  warp[wid/MAX_NUMBER_TILES].PC += 4;
 #endif
 #ifdef DEFAULT
   if (warp.PC != next_pc) {
@@ -2237,8 +2233,9 @@ void Emulator::execute(const Instr &instr, uint32_t wid, instr_trace_t *trace) {
   }
 #endif
 #ifdef GROUPS
-  if (warp[wid].PC != next_pc) {
+  if (warp[wid/MAX_NUMBER_TILES].PC != next_pc) {
     DP(3, "*** Next PC=0x" << std::hex << next_pc << std::dec);
+    warp[wid/MAX_NUMBER_TILES].PC = next_pc;
     warp[wid].PC = next_pc;
   }
 #endif

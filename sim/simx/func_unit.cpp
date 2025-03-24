@@ -23,8 +23,6 @@
 #include "cache_sim.h"
 #include "VX_types.h"
 
-#define GROUPS
-// #define DEFAULT
 
 using namespace vortex;
 
@@ -358,19 +356,19 @@ void SfuUnit::tick() {
 			output.push(trace, 2+delay);
 			if (trace->eop) {
 				auto trace_data = std::dynamic_pointer_cast<SFUTraceData>(trace->data);
-#ifdef DEFAULT
+				#ifdef DEFAULT
 				release_warp = core_->barrier(trace_data->arg1, trace_data->arg2, trace->wid);
-#endif
+				#endif
 
-#ifdef GROUPS
+				#ifdef GROUPS
 				std::bitset<32> mask = trace_data->arg2;
 				int count = mask.count();
-DT(1, "MASK, COUNT" << mask << ", " << count<< "," <<MAX_NUMBER_TILES - 1 - 4);
+				DT(1, "MASK, COUNT" << mask << ", " << count<< "," <<MAX_NUMBER_TILES - 1 - 4);
 				for (size_t warp_id = 0, nw = MAX_NUMBER_TILES; warp_id < nw; ++warp_id) {
 					if(mask.test(MAX_NUMBER_TILES - 1 - warp_id))
 						release_warp &= core_->barrier(trace_data->arg1, count, warp_id);
 				}
-#endif
+				#endif
 			}
 		} break;
 		case SfuType::TILE:{

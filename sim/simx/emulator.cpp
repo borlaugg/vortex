@@ -330,19 +330,12 @@ bool Emulator::wspawn(uint32_t num_warps, Word nextPC) {
 #ifdef GROUPS
 bool Emulator::tileMask(uint32_t tile_mask, uint32_t thread_count){
   int wid = 0;
-  bool reset = ~(tile_mask >> 31);
-  for(int i = MAX_NUMBER_TILES - 1 ; i >= 0 ; i--){
+  for(int i = warps_.size() - 1 ; i >= 0 ; i--){
     auto mask = (tile_mask >> i) & 0x01;
-    if(reset){
-      warps_[MAX_NUMBER_TILES - i -1].isActive = mask;
-      warps_[MAX_NUMBER_TILES - i -1].isStalled = !mask;
-    }
+    warps_[MAX_NUMBER_TILES - i -1].isActive = mask;
+    warps_[MAX_NUMBER_TILES - i -1].isStalled = !mask;
     if(mask){
-      wid = MAX_NUMBER_TILES - i - 1;
-      if(!reset){
-        warps_[wid].isActive = mask;
-        warps_[MAX_NUMBER_TILES - i -1].isStalled = !mask;
-      }
+      wid = warps_.size() - i - 1;
       warps_[wid].PC = warps_[0].PC;
       warps_[wid].tmask.reset();
       for (int j = 0; j < (int)thread_count; j++){
